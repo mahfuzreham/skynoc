@@ -4,12 +4,23 @@ declare(strict_types=1);
 $config = require __DIR__ . '/../config/config.php';
 date_default_timezone_set($config['timezone']);
 
+// Baseline security headers. HSTS is only sent over HTTPS.
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: SAMEORIGIN');
+header('Referrer-Policy: strict-origin-when-cross-origin');
+header('Permissions-Policy: camera=(), microphone=(), geolocation=()');
+if (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off') {
+    header('Strict-Transport-Security: max-age=31536000; includeSubDomains');
+}
+
 if (session_status() !== PHP_SESSION_ACTIVE) {
     session_name($config['session_name']);
     session_start([
         'cookie_httponly' => true,
         'cookie_samesite' => 'Lax',
         'cookie_secure' => (!empty($_SERVER['HTTPS']) && $_SERVER['HTTPS'] !== 'off'),
+        'cookie_lifetime' => 0,
+        'use_strict_mode' => true,
     ]);
 }
 
