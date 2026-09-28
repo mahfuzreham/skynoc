@@ -69,7 +69,7 @@ try {
 
         if ($action === 'api_create') {
             $plain='skynoc_'.bin2hex(random_bytes(24));
-            $scopes='licenses:read,reissue:create,reissue:read';
+            $scopes='licenses:read,reissue:create,reissue:read,packages:read,orders:create,orders:read';
             $s=$db->prepare('INSERT INTO api_keys(reseller_id,name,key_prefix,key_hash,scopes,expires_at) VALUES(?,?,?,?,?,?)');
             $s->execute([$rid,trim($_POST['name']) ?: 'Reseller API Key',substr($plain,0,15),hash('sha256',$plain),$scopes,$_POST['expires_at'] ?: null]);
             $newApiKey=$plain;
