@@ -16,3 +16,6 @@ TestResults.xml
 /config/config.php
 /storage/logs/*
 !/storage/logs/.gitkeep
+
+# Local production configuration / secrets
+config/config.local.php
