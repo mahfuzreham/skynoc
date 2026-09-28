@@ -26,10 +26,68 @@ try {
             if($resellerStatus==='pending' && $amount < 15) throw new RuntimeException('Minimum activation deposit is $15.00.');
             if($resellerStatus==='active' && $amount <= 0) throw new RuntimeException('Deposit amount must be positive.');
             if($method==='') throw new RuntimeException('Please select a payment method.');
-            $q=$db->prepare('INSERT INTO deposit_requests(reseller_id,amount,method,reference,note) VALUES(?,?,?,?,?)');
-            $q->execute([$rid,$amount,$method,$reference,$note]);
-            telegram_notify("💰 <b>NEW RESELLER DEPOSIT</b>\\nReseller: ".e($u['name'])."\\nRequest: ".(int)$db->lastInsertId()."\\nAmount: $".number_format($amount,2)."\\nMethod: ".e($method)."\\nReference: ".e($reference ?: '-'));
-            $msg='Deposit request submitted. Admin approval is required before the balance is credited.';
+
+            if ($method === 'USDT_BEP20') {
+                if (!$reference) throw new RuntimeException('USDT TXID is required.');
+                $verified = verify_bsc_usdt_tx($reference, number_format($amount, 8, '.', ''));
+                $q=$db->prepare('SELECT id FROM deposit_requests WHERE tx_hash=? LIMIT 1');
+                $q->execute([$verified['tx_hash']]);
+                if($q->fetchColumn()) throw new RuntimeException('This TXID has already been used.');
+
+                $db->beginTransaction();
+                try {
+                    $q=$db->prepare('SELECT status FROM resellers WHERE id=? FOR UPDATE');
+                    $q->execute([$rid]);
+                    $lockedStatus=$q->fetchColumn();
+                    if($lockedStatus===false) throw new RuntimeException('Reseller account not found.');
+                    $type=($lockedStatus==='pending') ? 'activation_deposit' : 'deposit';
+
+                    $q=$db->prepare('INSERT INTO deposit_requests
+                        (reseller_id,amount,method,reference,note,status,network,tx_hash,block_number,from_address,to_address,token_contract,token_amount,verified_at)
+                        VALUES(?,?,?,?,?,"approved",?,?,?,?,?,?,?,NOW())');
+                    $q->execute([
+                        $rid,$amount,'USDT_BEP20',$verified['tx_hash'],$note,
+                        'BSC / BEP20',$verified['tx_hash'],$verified['block_number'],
+                        $verified['from_address'],$verified['to_address'],$verified['token_contract'],
+                        $verified['token_amount']
+                    ]);
+                    $depositId=(int)$db->lastInsertId();
+
+                    wallet_credit($rid,$amount,$type,'DEPOSIT-'.$depositId,'Verified USDT BEP20 deposit #'.$depositId,$orderId=null,$createdBy=null);
+
+                    if($lockedStatus==='pending'){
+                        $db->prepare('UPDATE resellers SET status="active" WHERE id=?')->execute([$rid]);
+                    }
+                    $db->commit();
+                } catch(Throwable $e) {
+                    if($db->inTransaction()) $db->rollBack();
+                    if($e instanceof PDOException && $e->getCode()==='23000') {
+                        throw new RuntimeException('This TXID has already been used.');
+                    }
+                    throw $e;
+                }
+
+                $newBalance=reseller_wallet($rid);
+                skynoc_deposit_telegram_send(
+                    "💎 <b>USDT BEP20 DEPOSIT VERIFIED</b>\n\n"
+                    . "👤 Reseller: ".e($u['name'])." (#".$rid.")\n"
+                    . "🆔 Deposit: #".$depositId."\n"
+                    . "💰 Amount: ".number_format($amount,2)." USDT\n"
+                    . "🌐 Network: BSC / BEP20\n"
+                    . "🔗 TXID: <code>".e($verified['tx_hash'])."</code>\n"
+                    . "📤 From: <code>".e($verified['from_address'])."</code>\n"
+                    . "📥 To: <code>".e($verified['to_address'])."</code>\n"
+                    . "🔐 Confirmations: ".(int)$verified['confirmations']."\n"
+                    . "✅ Status: VERIFIED\n"
+                    . "💳 Wallet Balance: $".number_format($newBalance,2)
+                );
+                $msg='USDT deposit verified on BSC. The full amount has been added to your wallet.';
+            } else {
+                $q=$db->prepare('INSERT INTO deposit_requests(reseller_id,amount,method,reference,note) VALUES(?,?,?,?,?)');
+                $q->execute([$rid,$amount,$method,$reference,$note]);
+                telegram_notify("💰 <b>NEW RESELLER DEPOSIT</b>\nReseller: ".e($u['name'])."\nRequest: ".(int)$db->lastInsertId()."\nAmount: $".number_format($amount,2)."\nMethod: ".e($method)."\nReference: ".e($reference ?: '-'));
+                $msg='Deposit request submitted. Admin approval is required before the balance is credited.';
+            }
         }
 
         if ($action === 'order_create') {
@@ -57,14 +115,25 @@ try {
         }
 
         if ($action === 'reissue') {
-            $s = $db->prepare('SELECT id,domain FROM licenses WHERE id=? AND reseller_id=?');
+            $s = $db->prepare('SELECT id,license_key,domain,status,expires_at FROM licenses WHERE id=? AND reseller_id=?');
             $s->execute([(int)$_POST['license_id'],$rid]);
             $l = $s->fetch();
             if (!$l || !trim($_POST['new_domain'])) throw new RuntimeException('License not found or new domain is empty.');
             $q = $db->prepare('INSERT INTO reissue_requests(license_id,reseller_id,current_domain,new_domain,reason,status) VALUES(?,?,?,?,?,"pending")');
             $q->execute([$l['id'],$rid,$l['domain'],trim($_POST['new_domain']),trim($_POST['reason']) ?: null]);
             $id=(int)$db->lastInsertId();
-            telegram_notify("🔔 <b>NEW REISSUE REQUEST</b>\nReseller: ".e($u['name'])."\nRequest: ".$id."\nLicense: ".e((string)$l['id'])."\nCurrent: ".e($l['domain'] ?? '-')."\nNew: ".e(trim($_POST['new_domain'])));
+            $notify = [
+                'id'=>$id,
+                'reseller_id'=>$rid,
+                'reseller_name'=>$u['name'],
+                'reseller_email'=>$u['email'],
+                'license_key'=>$l['license_key'],
+                'current_domain'=>$l['domain'],
+                'new_domain'=>trim($_POST['new_domain']),
+                'reason'=>trim($_POST['reason']) ?: null,
+                'status'=>'pending'
+            ];
+            skynoc_notify_reissue_request($notify);
             $msg='Reissue request submitted.';
         }
 
@@ -141,7 +210,7 @@ $s->execute([$rid]); $tickets=$s->fetchAll();
 
 $s=$db->query('SELECT id,name,description,price,client_limit,billing_period FROM packages WHERE active=1 ORDER BY sort_order,id'); $packages=$s->fetchAll();
 $s=$db->prepare('SELECT o.*,p.name package_name,l.license_key FROM orders o JOIN packages p ON p.id=o.package_id LEFT JOIN licenses l ON l.id=o.license_id WHERE o.reseller_id=? ORDER BY o.id DESC LIMIT 50'); $s->execute([$rid]); $orders=$s->fetchAll();
-$s=$db->prepare('SELECT id,amount,method,reference,status,review_note,created_at FROM deposit_requests WHERE reseller_id=? ORDER BY id DESC LIMIT 20'); $s->execute([$rid]); $deposits=$s->fetchAll();
+$s=$db->prepare('SELECT id,amount,method,reference,status,review_note,network,tx_hash,created_at FROM deposit_requests WHERE reseller_id=? ORDER BY id DESC LIMIT 20'); $s->execute([$rid]); $deposits=$s->fetchAll();
 $ticketMessages=[];
 foreach($tickets as $t){$q=$db->prepare('SELECT tm.id,tm.message,tm.created_at,u.name,u.role FROM ticket_messages tm LEFT JOIN users u ON u.id=tm.user_id WHERE tm.ticket_id=? ORDER BY tm.id ASC');$q->execute([$t['id']]);$ticketMessages[$t['id']]=$q->fetchAll();}
 ?>
@@ -151,7 +220,7 @@ foreach($tickets as $t){$q=$db->prepare('SELECT tm.id,tm.message,tm.created_at,u
 <div class="nav"><b>SkyNoc Reseller Portal</b><span><?=e($u['name'])?> · <a href="/logout">Logout</a></span></div>
 <div class="wrap"><h1>Reseller Panel</h1>
 <div class="grid"><div class="card"><h3>Wallet Balance</h3><div style="font-size:32px;font-weight:900">$<?=number_format($wallet,2)?></div><small>Available balance for package purchases</small></div><div class="card"><h3>Account Status</h3><div style="font-size:20px;font-weight:800"><?=e(strtoupper($resellerStatus))?></div><?php if($resellerStatus!=='active'):?><p>Your account needs a minimum <b>$15.00 activation deposit</b>. The approved deposit remains in your wallet.</p><?php endif;?></div></div>
-<?php if($resellerStatus!=='active'):?><div class="card"><h3>Activate Reseller Account</h3><p>Deposit at least <b>$15.00</b>. Admin will verify the payment and credit the full approved amount to your wallet.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="deposit_request"><input name="amount" type="number" step="0.01" min="15" value="15.00" required><select name="method" required><option value="">Payment method</option><option>bKash</option><option>Binance / Crypto</option><option>Bank Transfer</option><option>Manual</option></select><input name="reference" placeholder="Payment/reference ID"><textarea name="note" placeholder="Optional note"></textarea><button>Submit Deposit Request</button></form></div><?php else:?><div class="card"><h3>Add Funds</h3><p>Submit a deposit request. Approved funds are added to your wallet.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="deposit_request"><input name="amount" type="number" step="0.01" min="1" placeholder="Amount USD" required><select name="method" required><option value="">Payment method</option><option>bKash</option><option>Binance / Crypto</option><option>Bank Transfer</option><option>Manual</option></select><input name="reference" placeholder="Payment/reference ID"><button>Submit Deposit</button></form></div><?php endif;?>
+<?php if($resellerStatus!=='active'):?><div class="card"><h3>Activate Reseller Account</h3><p>Deposit at least <b>$15.00</b>. Admin will verify the payment and credit the full approved amount to your wallet.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="deposit_request"><input name="amount" type="number" step="0.01" min="15" value="15.00" required><select name="method" required><option value="">Payment method</option><option value="USDT_BEP20">USDT (BEP20 / BSC)</option><option value="bKash">bKash</option><option value="Binance / Crypto">Binance / Crypto</option><option value="Bank Transfer">Bank Transfer</option><option value="Manual">Manual</option></select><input name="reference" placeholder="Payment reference / USDT TXID"><textarea name="note" placeholder="Optional note"></textarea><button>Submit Deposit Request</button></form></div><?php else:?><div class="card"><h3>Add Funds</h3><p>Submit a deposit request. Approved funds are added to your wallet.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="deposit_request"><input name="amount" type="number" step="0.01" min="1" placeholder="Amount USD" required><select name="method" required><option value="">Payment method</option><option value="USDT_BEP20">USDT (BEP20 / BSC)</option><option value="bKash">bKash</option><option value="Binance / Crypto">Binance / Crypto</option><option value="Bank Transfer">Bank Transfer</option><option value="Manual">Manual</option></select><input name="reference" placeholder="Payment/reference ID"><button>Submit Deposit</button></form></div><?php endif;?>
 <?php if($resellerStatus==='active'):?><div class="card"><h3>Buy a License Package</h3><p>Package price is deducted from your wallet when the order is submitted.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="order_create"><select name="package_id" required><option value="">Choose package</option><?php foreach($packages as $p):?><option value="<?=$p['id']?>"><?=e($p['name'])?> — $<?=number_format((float)$p['price'],2)?> / <?=e($p['billing_period'])?></option><?php endforeach;?></select><input name="domain" placeholder="WHMCS installation domain" required><button>Buy with Wallet</button></form></div><?php endif;?>
 <?php if($msg):?><div class="msg"><?=e($msg)?></div><?php endif;?><?php if($error):?><div class="err"><?=e($error)?></div><?php endif;?>
 
@@ -160,7 +229,7 @@ foreach($tickets as $t){$q=$db->prepare('SELECT tm.id,tm.message,tm.created_at,u
 <div class="grid"><div class="card"><h3>Request Reissue</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="reissue"><select name="license_id" required><?php foreach($licenses as $l):?><option value="<?=$l['id']?>"><?=e($l['license_key'].' — '.$l['domain'])?></option><?php endforeach;?></select><input name="new_domain" placeholder="New domain" required><textarea name="reason" placeholder="Reason"></textarea><button>Submit Reissue</button></form></div>
 <div class="card"><h3>Open Support Ticket</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="ticket_create"><input name="subject" placeholder="Subject" required><select name="priority"><option>normal</option><option>low</option><option>high</option><option>urgent</option></select><textarea name="message" placeholder="Describe your issue" required></textarea><button>Create Ticket</button></form></div></div>
 
-<h2>Orders</h2><div class="table-wrap"><table><tr><th>ID</th><th>Package</th><th>Domain</th><th>Amount</th><th>Status</th><th>Source</th><th>Created</th></tr><?php foreach($orders as $o):?><tr><td>#<?=$o['id']?></td><td><?=e($o['package_name'])?></td><td><?=e($o['domain'])?></td><td>$<?=number_format((float)$o['amount'],2)?></td><td><?=e($o['status'])?></td><td><?=e($o['source'])?></td><td><?=e($o['created_at'])?></td></tr><?php endforeach;?></table></div><h2>Deposit History</h2><div class="table-wrap"><table><tr><th>ID</th><th>Amount</th><th>Method</th><th>Reference</th><th>Status</th><th>Created</th></tr><?php foreach($deposits as $d):?><tr><td>#<?=$d['id']?></td><td>$<?=number_format((float)$d['amount'],2)?></td><td><?=e($d['method'])?></td><td><?=e($d['reference'] ?? '-')?></td><td><?=e($d['status'])?></td><td><?=e($d['created_at'])?></td></tr><?php endforeach;?></table></div><h2>Reissue History</h2><div class="table-wrap"><table><tr><th>ID</th><th>License</th><th>Current</th><th>New</th><th>Status</th><th>Created</th></tr><?php foreach($reissues as $rr):?><tr><td><?=$rr['id']?></td><td><?=e($rr['license_key'])?></td><td><?=e($rr['current_domain'])?></td><td><?=e($rr['new_domain'])?></td><td><?=e($rr['status'])?></td><td><?=e($rr['created_at'])?></td></tr><?php endforeach;?></table></div>
+<h2>Orders</h2><div class="table-wrap"><table><tr><th>ID</th><th>Package</th><th>Domain</th><th>Amount</th><th>Status</th><th>Source</th><th>Created</th></tr><?php foreach($orders as $o):?><tr><td>#<?=$o['id']?></td><td><?=e($o['package_name'])?></td><td><?=e($o['domain'])?></td><td>$<?=number_format((float)$o['amount'],2)?></td><td><?=e($o['status'])?></td><td><?=e($o['source'])?></td><td><?=e($o['created_at'])?></td></tr><?php endforeach;?></table></div><h2>Deposit History</h2><div class="table-wrap"><table><tr><th>ID</th><th>Amount</th><th>Method</th><th>Network</th><th>TXID/Reference</th><th>Status</th><th>Created</th></tr><?php foreach($deposits as $d):?><tr><td>#<?=$d['id']?></td><td>$<?=number_format((float)$d['amount'],2)?></td><td><?=e($d['method'])?></td><td><?=e($d['network'] ?? '-')?></td><td style="max-width:260px;word-break:break-all"><?=e($d['tx_hash'] ?: ($d['reference'] ?? '-'))?></td><td><?=e($d['status'])?></td><td><?=e($d['created_at'])?></td></tr><?php endforeach;?></table></div><h2>Reissue History</h2><div class="table-wrap"><table><tr><th>ID</th><th>License</th><th>Current</th><th>New</th><th>Status</th><th>Created</th></tr><?php foreach($reissues as $rr):?><tr><td><?=$rr['id']?></td><td><?=e($rr['license_key'])?></td><td><?=e($rr['current_domain'])?></td><td><?=e($rr['new_domain'])?></td><td><?=e($rr['status'])?></td><td><?=e($rr['created_at'])?></td></tr><?php endforeach;?></table></div>
 
 <?php if($newApiKey):?><div class="secret"><b>New API key — copy it now:</b><br><?=e($newApiKey)?></div><?php endif;?><div class="card"><h3>Generate API Key</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="api_create"><input name="name" placeholder="Key name"><input name="expires_at" type="datetime-local"><button>Generate API Key</button></form></div><h2>API Credentials</h2><div class="table-wrap"><table><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Status</th><th>Last Used</th><th>Expires</th><th>Action</th></tr><?php foreach($apiKeys as $k):?><tr><td><?=e($k['name'])?></td><td><?=e($k['key_prefix'])?>…</td><td><?=e($k['scopes'])?></td><td><?=e($k['status'])?></td><td><?=e($k['last_used_at'])?></td><td><?=e($k['expires_at'])?></td><td><?php if($k['status']==='active'):?><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="api_revoke"><input type="hidden" name="id" value="<?=$k['id']?>"><button>Revoke</button></form><?php endif;?></td></tr><?php endforeach;?></table></div>
 <p>API keys are only shown in full once, when an admin generates them. Never share them publicly.</p>
