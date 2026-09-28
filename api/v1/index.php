@@ -36,6 +36,49 @@ $db->prepare('UPDATE api_keys SET last_used_at=NOW() WHERE id=?')->execute([$key
 $path = parse_url($_SERVER['REQUEST_URI'], PHP_URL_PATH);
 $method = $_SERVER['REQUEST_METHOD'];
 
+if ($method === 'GET' && preg_match('#/packages/?$#',$path)) {
+    if (!api_has_scope($key,'packages:read')) json_response(['error'=>'insufficient_scope'],403);
+    $s=$db->query('SELECT id,name,slug,description,price,client_limit,billing_period FROM packages WHERE active=1 ORDER BY sort_order,id');
+    json_response(['data'=>$s->fetchAll()]);
+}
+
+if ($method === 'GET' && preg_match('#/orders/?$#',$path)) {
+    if (!api_has_scope($key,'orders:read')) json_response(['error'=>'insufficient_scope'],403);
+    $s=$db->prepare('SELECT o.id,o.package_id,p.name package_name,o.license_id,o.domain,o.amount,o.status,o.source,o.created_at,o.updated_at,o.completed_at FROM orders o JOIN packages p ON p.id=o.package_id WHERE o.reseller_id=? ORDER BY o.id DESC');
+    $s->execute([$key['reseller_id']]);
+    json_response(['data'=>$s->fetchAll()]);
+}
+
+if ($method === 'POST' && preg_match('#/orders/?$#',$path)) {
+    if (!api_has_scope($key,'orders:create')) json_response(['error'=>'insufficient_scope'],403);
+    $data=json_decode(file_get_contents('php://input'),true) ?: [];
+    $packageId=(int)($data['package_id'] ?? 0);
+    $domain=trim((string)($data['domain'] ?? ''));
+    if($packageId<=0) json_response(['error'=>'package_id_required'],422);
+    if($domain==='') json_response(['error'=>'domain_required'],422);
+    try {
+        $db->beginTransaction();
+        $q=$db->prepare('SELECT id,name,price,active FROM packages WHERE id=? AND active=1 FOR UPDATE'); $q->execute([$packageId]); $package=$q->fetch();
+        if(!$package) throw new RuntimeException('package_not_found');
+        $q=$db->prepare('SELECT status FROM resellers WHERE id=? FOR UPDATE'); $q->execute([$key['reseller_id']]); $rs=$q->fetch();
+        if(!$rs || $rs['status']!=='active') throw new RuntimeException('reseller_not_active');
+        $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source) VALUES(?,?,?,?,"pending","api")');
+        $price=(float)$package['price']; $q->execute([$key['reseller_id'],$packageId,$domain,$price]); $orderId=(int)$db->lastInsertId();
+        wallet_debit((int)$key['reseller_id'],$price,'purchase','ORDER-'.$orderId,'API package purchase: '.$package['name'],$orderId,null);
+        $db->commit();
+        telegram_notify("🛒 <b>NEW API ORDER</b>\\nReseller: ".e($key['reseller_name'])."\\nOrder: ".$orderId."\\nPackage: ".e($package['name'])."\\nAmount: $".number_format($price,2)."\\nDomain: ".e($domain));
+        json_response(['message'=>'order_created','order_id'=>$orderId,'amount'=>$price,'status'=>'pending'],201);
+    } catch (Throwable $e) {
+        if($db->inTransaction()) $db->rollBack();
+        $known=['package_not_found','reseller_not_active','Insufficient wallet balance.'];
+        $msg=$e->getMessage();
+        if($msg==='Insufficient wallet balance.') json_response(['error'=>'insufficient_balance'],422);
+        if(in_array($msg,$known,true)) json_response(['error'=>$msg],422);
+        error_log('SkyNoc API order error: '.$msg);
+        json_response(['error'=>'order_failed'],500);
+    }
+}
+
 if ($method === 'GET' && preg_match('#/licenses/?$#',$path)) {
     if (!api_has_scope($key,'licenses:read')) json_response(['error'=>'insufficient_scope'],403);
     $s=$db->prepare('SELECT id,license_key,domain,status,expires_at,created_at,updated_at FROM licenses WHERE reseller_id=? ORDER BY id DESC');
