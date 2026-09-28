@@ -2,21 +2,13 @@
 declare(strict_types=1);
 
 /*
- * Production DB config.
- * Set real credentials here. This file should not contain provider credentials.
+ * Production override:
+ * Create config/config.local.php on the server and return the full config array.
+ * It is intentionally ignored by Git.
  */
-return [
-    'app_name' => 'SkyNoc License Manager',
-    'base_url' => 'https://SkyNoc.Net',
-    'timezone' => 'Asia/Dhaka',
-    'session_name' => 'skynoc_session',
-    'auto_migrate' => true,
-    'db' => [
-        'host' => '127.0.0.1',
-        'port' => 3306,
-        'name' => 'DATABASE_NAME',
-        'user' => 'DATABASE_USER',
-        'pass' => 'DATABASE_PASSWORD',
-        'charset' => 'utf8mb4',
-    ],
-];
+$local = __DIR__ . '/config.local.php';
+if (is_file($local)) {
+    return require $local;
+}
+
+return require __DIR__ . '/config.example.php';
