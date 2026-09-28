@@ -51,3 +51,26 @@ function telegram_notify(string $text, ?array $buttons=null): bool {
     $result=curl_exec($ch); curl_close($ch);
     return is_string($result) && (json_decode($result,true)['ok'] ?? false) === true;
 }
+
+function reseller_wallet(int $resellerId): float {
+    global $db;
+    $s=$db->prepare('SELECT wallet_balance FROM resellers WHERE id=? LIMIT 1');
+    $s->execute([$resellerId]);
+    return (float)($s->fetchColumn() ?? 0);
+}
+function wallet_credit(int $resellerId, float $amount, string $type='deposit', ?string $reference=null, ?string $description=null, ?int $orderId=null, ?int $createdBy=null): void {
+    global $db;
+    if ($amount <= 0) throw new RuntimeException('Credit amount must be positive.');
+    $db->prepare('UPDATE resellers SET wallet_balance=wallet_balance+? WHERE id=?')->execute([$amount,$resellerId]);
+    $s=$db->prepare('INSERT INTO wallet_transactions(reseller_id,type,amount,reference,description,order_id,created_by) VALUES(?,?,?,?,?,?,?)');
+    $s->execute([$resellerId,$type,$amount,$reference,$description,$orderId,$createdBy]);
+}
+function wallet_debit(int $resellerId, float $amount, string $type='purchase', ?string $reference=null, ?string $description=null, ?int $orderId=null, ?int $createdBy=null): void {
+    global $db;
+    if ($amount <= 0) throw new RuntimeException('Debit amount must be positive.');
+    $s=$db->prepare('UPDATE resellers SET wallet_balance=wallet_balance-? WHERE id=? AND wallet_balance>=?');
+    $s->execute([$amount,$resellerId,$amount]);
+    if ($s->rowCount() !== 1) throw new RuntimeException('Insufficient wallet balance.');
+    $s=$db->prepare('INSERT INTO wallet_transactions(reseller_id,type,amount,reference,description,order_id,created_by) VALUES(?,?,?,?,?,?,?)');
+    $s->execute([$resellerId,$type,-$amount,$reference,$description,$orderId,$createdBy]);
+}
