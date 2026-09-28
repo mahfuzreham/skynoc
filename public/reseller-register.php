@@ -43,7 +43,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
         $stmt->execute([$name, $email, password_hash($password, PASSWORD_DEFAULT)]);
         $userId = (int)$db->lastInsertId();
 
-        $stmt = $db->prepare('INSERT INTO resellers(user_id,name,email,status) VALUES(?, ?, ?, "active")');
+        $stmt = $db->prepare('INSERT INTO resellers(user_id,name,email,status,wallet_balance) VALUES(?, ?, ?, "pending", 0.00)');
         $stmt->execute([$userId, $name, $email]);
 
         $db->commit();
