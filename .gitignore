@@ -1,0 +1,18 @@
+### AL ###
+#Template for AL projects for Dynamics 365 Business Central
+.vscode/
+.alcache/
+.alpackages/
+.snapshots/
+.output/
+*.app
+rad.json
+*.g.xlf
+*.bclicense
+*.flf
+TestResults.xml
+
+# SkyNoc local configuration and runtime data
+/config/config.php
+/storage/logs/*
+!/storage/logs/.gitkeep
