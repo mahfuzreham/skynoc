@@ -9,6 +9,7 @@ if (!$r) exit('Reseller profile not found.');
 $rid = (int)$r['id'];
 $msg = null;
 $error = null;
+$newApiKey = null;
 
 try {
     if ($_SERVER['REQUEST_METHOD'] === 'POST') {
@@ -25,6 +26,22 @@ try {
             $id=(int)$db->lastInsertId();
             telegram_notify("🔔 <b>NEW REISSUE REQUEST</b>\nReseller: ".e($u['name'])."\nRequest: ".$id."\nLicense: ".e((string)$l['id'])."\nCurrent: ".e($l['domain'] ?? '-')."\nNew: ".e(trim($_POST['new_domain'])));
             $msg='Reissue request submitted.';
+        }
+
+        if ($action === 'api_create') {
+            $plain='skynoc_'.bin2hex(random_bytes(24));
+            $scopes='licenses:read,reissue:create,reissue:read';
+            $s=$db->prepare('INSERT INTO api_keys(reseller_id,name,key_prefix,key_hash,scopes,expires_at) VALUES(?,?,?,?,?,?)');
+            $s->execute([$rid,trim($_POST['name']) ?: 'Reseller API Key',substr($plain,0,15),hash('sha256',$plain),$scopes,$_POST['expires_at'] ?: null]);
+            $newApiKey=$plain;
+            audit('reseller_api_key_created','api_keys',(int)$db->lastInsertId());
+        }
+
+        if ($action === 'api_revoke') {
+            $id=(int)$_POST['id'];
+            $db->prepare('UPDATE api_keys SET status="revoked" WHERE id=? AND reseller_id=?')->execute([$id,$rid]);
+            audit('reseller_api_key_revoked','api_keys',$id);
+            $msg='API key revoked.';
         }
 
         if ($action === 'ticket_create') {
@@ -84,7 +101,7 @@ $ticketMessages=[];
 foreach($tickets as $t){$q=$db->prepare('SELECT tm.id,tm.message,tm.created_at,u.name,u.role FROM ticket_messages tm LEFT JOIN users u ON u.id=tm.user_id WHERE tm.ticket_id=? ORDER BY tm.id ASC');$q->execute([$t['id']]);$ticketMessages[$t['id']]=$q->fetchAll();}
 ?>
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SkyNoc Reseller</title>
-<style>*{box-sizing:border-box}body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f6f8fb;margin:0;color:#0f172a}.nav{background:#111827;color:#fff;padding:15px 5%;display:flex;justify-content:space-between;align-items:center;gap:15px}.nav a{color:#fff;text-decoration:none}.wrap{max-width:1200px;margin:25px auto;padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:#fff;padding:20px;border-radius:16px;margin-bottom:18px;border:1px solid #e5e7eb;box-shadow:0 4px 20px #0f172a0a}table{width:100%;min-width:700px;border-collapse:collapse;background:#fff}td,th{padding:12px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}.table-wrap{overflow-x:auto;border-radius:14px;margin-bottom:18px}input,textarea,select,button{padding:12px;width:100%;margin:5px 0 9px;border:1px solid #dbe2ea;border-radius:10px;font:inherit}button{background:#111827;color:#fff;border:0;font-weight:700}.msg{background:#ecfdf5;color:#166534;padding:12px;border-radius:10px;margin-bottom:15px}.err{background:#fef2f2;color:#991b1b;padding:12px;border-radius:10px;margin-bottom:15px}.notice{padding:12px;border-radius:10px;background:#eff6ff;margin:8px 0}.unread{border-left:4px solid #111827}@media(max-width:700px){.nav{align-items:flex-start;flex-direction:column}.wrap{padding:0 12px}.card{padding:16px}}
+<style>*{box-sizing:border-box}body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;background:#f6f8fb;margin:0;color:#0f172a}.nav{background:#111827;color:#fff;padding:15px 5%;display:flex;justify-content:space-between;align-items:center;gap:15px}.nav a{color:#fff;text-decoration:none}.wrap{max-width:1200px;margin:25px auto;padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:#fff;padding:20px;border-radius:16px;margin-bottom:18px;border:1px solid #e5e7eb;box-shadow:0 4px 20px #0f172a0a}table{width:100%;min-width:700px;border-collapse:collapse;background:#fff}td,th{padding:12px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}.table-wrap{overflow-x:auto;border-radius:14px;margin-bottom:18px}input,textarea,select,button{padding:12px;width:100%;margin:5px 0 9px;border:1px solid #dbe2ea;border-radius:10px;font:inherit}button{background:#111827;color:#fff;border:0;font-weight:700}.msg{background:#ecfdf5;color:#166534;padding:12px;border-radius:10px;margin-bottom:15px}.err{background:#fef2f2;color:#991b1b;padding:12px;border-radius:10px;margin-bottom:15px}.secret{background:#fffbeb;color:#92400e;padding:14px;border-radius:10px;word-break:break-all}.notice{padding:12px;border-radius:10px;background:#eff6ff;margin:8px 0}.unread{border-left:4px solid #111827}@media(max-width:700px){.nav{align-items:flex-start;flex-direction:column}.wrap{padding:0 12px}.card{padding:16px}}
 </style></head><body>
 <div class="nav"><b>SkyNoc Reseller Portal</b><span><?=e($u['name'])?> · <a href="/logout">Logout</a></span></div>
 <div class="wrap"><h1>Reseller Panel</h1>
@@ -97,7 +114,7 @@ foreach($tickets as $t){$q=$db->prepare('SELECT tm.id,tm.message,tm.created_at,u
 
 <h2>Reissue History</h2><div class="table-wrap"><table><tr><th>ID</th><th>License</th><th>Current</th><th>New</th><th>Status</th><th>Created</th></tr><?php foreach($reissues as $rr):?><tr><td><?=$rr['id']?></td><td><?=e($rr['license_key'])?></td><td><?=e($rr['current_domain'])?></td><td><?=e($rr['new_domain'])?></td><td><?=e($rr['status'])?></td><td><?=e($rr['created_at'])?></td></tr><?php endforeach;?></table></div>
 
-<h2>API Credentials</h2><div class="table-wrap"><table><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Status</th><th>Last Used</th><th>Expires</th></tr><?php foreach($apiKeys as $k):?><tr><td><?=e($k['name'])?></td><td><?=e($k['key_prefix')?>…</td><td><?=e($k['scopes'])?></td><td><?=e($k['status'])?></td><td><?=e($k['last_used_at'])?></td><td><?=e($k['expires_at'])?></td></tr><?php endforeach;?></table></div>
+<?php if($newApiKey):?><div class="secret"><b>New API key — copy it now:</b><br><?=e($newApiKey)?></div><?php endif;?><div class="card"><h3>Generate API Key</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="api_create"><input name="name" placeholder="Key name"><input name="expires_at" type="datetime-local"><button>Generate API Key</button></form></div><h2>API Credentials</h2><div class="table-wrap"><table><tr><th>Name</th><th>Prefix</th><th>Scopes</th><th>Status</th><th>Last Used</th><th>Expires</th><th>Action</th></tr><?php foreach($apiKeys as $k):?><tr><td><?=e($k['name'])?></td><td><?=e($k['key_prefix')?>…</td><td><?=e($k['scopes'])?></td><td><?=e($k['status'])?></td><td><?=e($k['last_used_at'])?></td><td><?=e($k['expires_at'])?></td><td><?php if($k['status']==='active'):?><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="api_revoke"><input type="hidden" name="id" value="<?=$k['id']?>"><button>Revoke</button></form><?php endif;?></td></tr><?php endforeach;?></table></div>
 <p>API keys are only shown in full once, when an admin generates them. Never share them publicly.</p>
 
 <h2>Notifications</h2><div class="card"><?php foreach($notifications as $n):?><div class="notice <?=$n['read_at']?'':'unread'?>"><b><?=e($n['title'])?></b><br><?=nl2br(e($n['message']))?><br><small><?=e($n['created_at'])?></small><?php if(!$n['read_at']):?><form method="post" style="margin-top:7px"><?=csrf_field()?><input type="hidden" name="action" value="notification_read"><input type="hidden" name="id" value="<?=$n['id']?>"><button>Mark read</button></form><?php endif;?></div><?php endforeach;?></div>
