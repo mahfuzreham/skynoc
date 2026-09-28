@@ -10,3 +10,25 @@ CREATE TABLE ticket_messages (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,tick
 CREATE TABLE audit_logs (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,user_id BIGINT UNSIGNED NULL,action VARCHAR(100) NOT NULL,entity VARCHAR(80) NULL,entity_id BIGINT UNSIGNED NULL,details TEXT NULL,ip_address VARCHAR(45) NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE telegram_settings (id TINYINT UNSIGNED PRIMARY KEY,bot_token VARCHAR(255) NOT NULL,admin_chat_id VARCHAR(64) NOT NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE INDEX idx_license_reseller ON licenses(reseller_id); CREATE INDEX idx_reissue_status ON reissue_requests(status); CREATE INDEX idx_audit_created ON audit_logs(created_at); CREATE INDEX idx_api_reseller_status ON api_keys(reseller_id,status);
+
+-- Phase 1 production additions
+ALTER TABLE users ADD COLUMN permissions JSON NULL AFTER status;
+ALTER TABLE api_keys ADD COLUMN scopes VARCHAR(255) NOT NULL DEFAULT 'licenses:read,reissue:create,reissue:read' AFTER key_hash;
+CREATE TABLE IF NOT EXISTS notifications (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ reseller_id BIGINT UNSIGNED NOT NULL,
+ type VARCHAR(60) NOT NULL,
+ title VARCHAR(255) NOT NULL,
+ message TEXT NOT NULL,
+ read_at DATETIME NULL,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+ INDEX idx_notifications_reseller_read (reseller_id,read_at),
+ INDEX idx_notifications_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+CREATE TABLE IF NOT EXISTS api_rate_limits (
+ api_key_id BIGINT UNSIGNED PRIMARY KEY,
+ window_started_at DATETIME NOT NULL,
+ request_count INT UNSIGNED NOT NULL DEFAULT 0,
+ FOREIGN KEY(api_key_id) REFERENCES api_keys(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
