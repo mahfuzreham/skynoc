@@ -6,11 +6,17 @@ function redirect(string $path): never { header('Location: ' . $path); exit; }
 function csrf_token(): string { if (empty($_SESSION['_csrf'])) $_SESSION['_csrf'] = bin2hex(random_bytes(32)); return $_SESSION['_csrf']; }
 function csrf_field(): string { return '<input type="hidden" name="_csrf" value="'.e(csrf_token()).'">'; }
 function verify_csrf(): void { if (!hash_equals($_SESSION['_csrf'] ?? '', $_POST['_csrf'] ?? '')) { http_response_code(419); exit('Invalid CSRF token.'); } }
-function current_user(): ?array { global $db; static $user = false; if ($user !== false) return $user; $id = $_SESSION['user_id'] ?? null; if (!$id) return $user = null; $s=$db->prepare('SELECT id,name,email,role,status FROM users WHERE id=? LIMIT 1'); $s->execute([$id]); return $user=$s->fetch() ?: null; }
+function current_user(): ?array { global $db; static $user = false; if ($user !== false) return $user; $id = $_SESSION['user_id'] ?? null; if (!$id) return $user = null; $s=$db->prepare('SELECT id,name,email,role,status,permissions FROM users WHERE id=? LIMIT 1'); $s->execute([$id]); return $user=$s->fetch() ?: null; }
 function require_auth(): array { $u=current_user(); if (!$u || $u['status'] !== 'active') { $_SESSION=[]; session_destroy(); redirect('/login.php'); } return $u; }
 function require_role(array $roles): array { $u=require_auth(); if (!in_array($u['role'], $roles, true)) { http_response_code(403); exit('Forbidden'); } return $u; }
 function can(string $permission, array $user): bool {
-    if ($user['role'] === 'owner') return true;
+    if (($user['role'] ?? '') === 'owner') return true;
+    $overrides = [];
+    if (!empty($user['permissions'])) {
+        $decoded = json_decode((string)$user['permissions'], true);
+        if (is_array($decoded)) $overrides = $decoded;
+    }
+    if (array_key_exists($permission, $overrides)) return (bool)$overrides[$permission];
     $map=[
       'provider.manage'=>['admin','manager'],
       'license.manage'=>['admin','manager'],
@@ -18,8 +24,18 @@ function can(string $permission, array $user): bool {
       'reissue.manage'=>['admin','manager'],
       'api.manage'=>['admin','manager'],
       'staff.manage'=>['admin'],
+      'ticket.manage'=>['admin','manager','staff'],
     ];
     return in_array($user['role'], $map[$permission] ?? [], true);
+}
+function notify_reseller(int $resellerId, string $type, string $title, string $message): void {
+    global $db;
+    $s=$db->prepare('INSERT INTO notifications(reseller_id,type,title,message) VALUES(?,?,?,?)');
+    $s->execute([$resellerId,$type,$title,$message]);
+}
+function api_has_scope(array $key, string $scope): bool {
+    $scopes=array_filter(array_map('trim',explode(',',(string)($key['scopes'] ?? '')));
+    return in_array($scope,$scopes,true);
 }
 function audit(string $action, ?string $entity=null, ?int $entityId=null, ?string $details=null): void { global $db; $u=current_user(); $s=$db->prepare('INSERT INTO audit_logs(user_id,action,entity,entity_id,details,ip_address) VALUES(?,?,?,?,?,?)'); $s->execute([$u['id'] ?? null,$action,$entity,$entityId,$details,$_SERVER['REMOTE_ADDR'] ?? null]); }
 function json_response(array $data, int $status=200): never { http_response_code($status); header('Content-Type: application/json; charset=utf-8'); echo json_encode($data, JSON_UNESCAPED_SLASHES); exit; }
