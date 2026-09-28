@@ -78,8 +78,8 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST') {
 <section class="intro">
 <a class="brand" href="/"><span class="mark">SN</span>SkyNoc</a>
 <h1>Start your reseller account.</h1>
-<p>Create your SkyNoc reseller account and manage WHMCS licenses, reissue requests, support and API access from one portal.</p>
-<div class="points">
+<p>Create your SkyNoc reseller account and activate it with a minimum $15 deposit. The approved deposit stays in your wallet for license purchases.</p>
+<div class="points"><div class="point"><span class="check">$</span><div><b>$15 activation deposit</b>The approved activation deposit becomes your wallet balance; it is not a separate activation fee.</div></div>
 <div class="point"><span class="check">✓</span><div><b>License management</b>View and manage licenses assigned to your account.</div></div>
 <div class="point"><span class="check">✓</span><div><b>Reissue requests</b>Submit domain changes and follow their status.</div></div>
 <div class="point"><span class="check">✓</span><div><b>Reseller API</b>Connect your billing platform with scoped API access.</div></div>
