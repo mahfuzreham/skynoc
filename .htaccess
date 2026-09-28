@@ -30,4 +30,4 @@ RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
 RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ /$1 [R=301,L]
 
 # Block direct access to non-public application directories.
-RewriteRule ^(?:app|config|database|storage|bin)(?:/|$) - [F,L]
+RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
