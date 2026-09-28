@@ -216,6 +216,7 @@ $reissues = $db->query('SELECT rr.*,l.license_key,r.name reseller_name FROM reis
 $staff = $db->query('SELECT id,name,email,role,status,permissions,created_at FROM users WHERE role IN ("admin","manager","staff") ORDER BY id DESC')->fetchAll();
 $apiKeys = $db->query('SELECT ak.id,ak.name,ak.key_prefix,ak.scopes,ak.status,ak.last_used_at,ak.expires_at,r.name reseller_name FROM api_keys ak JOIN resellers r ON r.id=ak.reseller_id ORDER BY ak.id DESC LIMIT 100')->fetchAll();
 $tickets = $db->query('SELECT t.*,r.name reseller_name FROM tickets t LEFT JOIN resellers r ON r.id=t.reseller_id ORDER BY t.id DESC LIMIT 50')->fetchAll();
+$telegramSettings = $db->query('SELECT * FROM telegram_settings WHERE id=1 LIMIT 1')->fetch() ?: [];
 ?>
 <!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>SkyNoc Admin</title>
 <style>*{box-sizing:border-box}body{font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif;margin:0;background:#f6f8fb;color:#0f172a}.nav{background:#111827;color:#fff;padding:15px 5%;display:flex;justify-content:space-between;align-items:center;gap:15px}.nav a{color:#fff}.wrap{max-width:1400px;margin:24px auto;padding:0 16px}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:16px}.card{background:#fff;padding:20px;border-radius:16px;box-shadow:0 4px 20px #0f172a0a;border:1px solid #e5e7eb;margin-bottom:18px}input,select,textarea,button{width:100%;padding:11px;margin:5px 0 9px;border:1px solid #dbe2ea;border-radius:10px;font:inherit}button{background:#111827;color:#fff;border:0;font-weight:700;cursor:pointer}.msg{background:#ecfdf5;color:#166534;padding:12px;border-radius:10px;margin-bottom:15px}.err{background:#fef2f2;color:#991b1b;padding:12px;border-radius:10px;margin-bottom:15px}.secret{background:#fffbeb;color:#92400e;padding:14px;border-radius:10px;word-break:break-all}.table-wrap{overflow-x:auto;border-radius:14px;margin-bottom:24px}table{width:100%;min-width:850px;border-collapse:collapse;background:#fff}td,th{padding:11px;border-bottom:1px solid #eef2f7;text-align:left;font-size:13px}.checks label{display:block;margin:7px 0}.inline{display:flex;gap:8px;align-items:center}.inline>*{width:auto;margin:0}@media(max-width:700px){.nav{align-items:flex-start;flex-direction:column}.wrap{padding:0 12px}.card{padding:16px}}
@@ -237,12 +238,12 @@ $tickets = $db->query('SELECT t.*,r.name reseller_name FROM tickets t LEFT JOIN 
 <div class="card"><h3>Telegram Bot Settings</h3>
 <p><b>License Control Bot</b> sends reissue/license alerts and provides Telegram admin controls.</p>
 <form method="post"><?=csrf_field()?><input type="hidden" name="action" value="telegram">
-<input name="license_bot_token" placeholder="License Control Bot Token" required>
-<input name="license_admin_chat_id" placeholder="License Admin Chat ID" required>
+<input name="license_bot_token" value="<?=e((string)($telegramSettings['license_bot_token'] ?? $telegramSettings['bot_token'] ?? ''))?>" placeholder="License Control Bot Token" required>
+<input name="license_admin_chat_id" value="<?=e((string)($telegramSettings['license_admin_chat_id'] ?? $telegramSettings['admin_chat_id'] ?? ''))?>" placeholder="License Admin Chat ID" required>
 <hr>
 <p><b>USDT Deposit Bot</b> is a separate bot used only for verified USDT BEP20 deposit notifications.</p>
-<input name="deposit_bot_token" placeholder="USDT Deposit Bot Token">
-<input name="deposit_admin_chat_id" placeholder="USDT Deposit Admin Chat ID">
+<input name="deposit_bot_token" value="<?=e((string)($telegramSettings['deposit_bot_token'] ?? ''))?>" placeholder="USDT Deposit Bot Token">
+<input name="deposit_admin_chat_id" value="<?=e((string)($telegramSettings['deposit_admin_chat_id'] ?? ''))?>" placeholder="USDT Deposit Admin Chat ID">
 <button>Save Telegram Settings</button>
 </form>
 <small>Control webhook: /telegram/control</small>
