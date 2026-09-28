@@ -35,7 +35,7 @@ footer{background:#081225;color:#8d9bb0;padding:31px 0;font-size:11px}.foot{disp
 
 <nav><div class="container navin">
 <a class="brand" href="/"><span class="brandmark">SN</span><span>SkyNoc<small>WHMCS LICENSES</small></span></a>
-<div class="links"><a href="#plans">Licenses</a><a href="#why" class="hide">Why SkyNoc</a><a href="#faq" class="hide">FAQ</a><a href="/api-docs" class="hide">API Docs</a><a href="/login" class="login">Login</a><a href="#configure" class="get">Get Started</a></div>
+<div class="links"><a href="#plans">Licenses</a><a href="#why" class="hide">Why SkyNoc</a><a href="#faq" class="hide">FAQ</a><a href="/api-docs" class="hide">API Docs</a><a href="/login" class="login">Login</a><a href="/reseller/register" class="get">Register as Reseller</a></div>
 </div></nav>
 
 <main>
@@ -44,7 +44,7 @@ footer{background:#081225;color:#8d9bb0;padding:31px 0;font-size:11px}.foot{disp
 <div class="kicker">WHMCS license sales</div>
 <h1>WHMCS licensing, <em>without the hassle.</em></h1>
 <p>Choose a license that fits your business, send us your installation details and manage everything from one simple SkyNoc account.</p>
-<div class="actions"><a class="btn primary" href="#configure">Buy With SkyNoc →</a><a class="btn outline" href="https://www.whmcs.com/members/aff.php?aff=42837" target="_blank" rel="noopener noreferrer">Buy Direct from WHMCS ↗</a></div>
+<div class="actions"><a class="btn primary" href="/reseller/register">Become a SkyNoc Reseller →</a><a class="btn outline" href="https://www.whmcs.com/members/aff.php?aff=42837" target="_blank" rel="noopener noreferrer">Buy Direct from WHMCS ↗</a></div>
 <div class="trust"><span>Genuine license</span><span>Fast setup</span><span>Human support</span></div>
 </div>
 <div class="mock" aria-label="SkyNoc license dashboard preview">
@@ -59,25 +59,11 @@ footer{background:#081225;color:#8d9bb0;padding:31px 0;font-size:11px}.foot{disp
 <section class="section" id="plans"><div class="container">
 <div class="head"><div class="label">License plans</div><h2>Pick the plan your business needs</h2><p>Simple monthly reference pricing. Confirm current availability and final SkyNoc pricing before purchase.</p></div>
 <div class="plans">
-<div class="plan"><h3>Plus</h3><div class="desc">For smaller businesses and new WHMCS installations.</div><div class="price">$34.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>Up to 250 active clients</li><li>Standard support</li></ul><a class="btn outline full" href="#configure" onclick="pick('Plus')">Choose Plus</a></div>
-<div class="plan pop"><span class="pill">MOST REQUESTED</span><h3>Professional</h3><div class="desc">A practical choice for growing hosting and service businesses.</div><div class="price">$54.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>Up to 500 active clients</li><li>Standard support</li></ul><a class="btn primary full" href="#configure" onclick="pick('Professional')">Choose Professional</a></div>
-<div class="plan"><h3>Business</h3><div class="desc">Higher client limits for established operations.</div><div class="price">From $84.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>1,000+ active clients</li><li>Priority support options</li></ul><a class="btn outline full" href="#configure" onclick="pick('Business 1000')">Choose Business</a></div>
+<div class="plan"><h3>Plus</h3><div class="desc">For smaller businesses and new WHMCS installations.</div><div class="price">$34.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>Up to 250 active clients</li><li>Standard support</li></ul><a class="btn outline full" href="/reseller/register">Register as Reseller</a></div>
+<div class="plan pop"><span class="pill">MOST REQUESTED</span><h3>Professional</h3><div class="desc">A practical choice for growing hosting and service businesses.</div><div class="price">$54.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>Up to 500 active clients</li><li>Standard support</li></ul><a class="btn primary full" href="/reseller/register">Register as Reseller</a></div>
+<div class="plan"><h3>Business</h3><div class="desc">Higher client limits for established operations.</div><div class="price">From $84.95 <small>/ month</small></div><ul><li>Self-hosted WHMCS</li><li>1,000+ active clients</li><li>Priority support options</li></ul><a class="btn outline full" href="/reseller/register">Register as Reseller</a></div>
 </div>
 <div class="reference">Want to buy directly? <a href="https://www.whmcs.com/members/aff.php?aff=42837" target="_blank" rel="noopener noreferrer">Buy Direct from WHMCS</a> · <a href="https://www.whmcs.com/pricing/" target="_blank" rel="noopener noreferrer">View WHMCS pricing</a></div>
-</div></section>
-
-<section class="configure" id="configure"><div class="container config-grid">
-<div class="config-copy"><div class="label">Start your order</div><h2>Tell us where your WHMCS license will run.</h2><p>Give us the basic information for your account. You can continue to your SkyNoc login after submitting the configuration.</p>
-<div class="points"><div class="point"><span>01</span><div><b>Choose your plan</b>Pick the client limit that matches your installation.</div></div><div class="point"><span>02</span><div><b>Add your domain</b>Tell us the WHMCS installation domain you intend to license.</div></div><div class="point"><span>03</span><div><b>Manage from your account</b>Use the reseller portal for license and reissue operations.</div></div></div></div>
-<div class="order"><h3>Configure your license</h3><p>These details are saved in this browser before you continue.</p>
-<form onsubmit="saveConfig(event)">
-<div class="field"><label>License plan</label><select id="plan" onchange="updatePrice"><option value="Plus">Plus — up to 250 clients</option><option value="Professional">Professional — up to 500 clients</option><option value="Business 1000">Business 1000 — up to 1,000 clients</option><option value="Business 2500">Business 2500 — up to 2,500 clients</option><option value="Business 5000">Business 5000 — up to 5,000 clients</option><option value="Business 10000">Business 10000 — up to 10,000 clients</option></select></div>
-<div class="two"><div class="field"><label>Your name</label><input id="name" type="text" autocomplete="name" placeholder="Full name"></div><div class="field"><label>Business / company</label><input id="company" type="text" autocomplete="organization" placeholder="Company name"></div></div>
-<div class="field"><label>WHMCS installation domain</label><input id="domain" type="text" inputmode="url" placeholder="billing.example.com"></div>
-<div class="field"><label>Account email</label><input id="email" type="email" autocomplete="email" placeholder="you@example.com"></div>
-<div class="summary"><div><small>Billing cycle</small><b>Monthly</b></div><div><small>Reference price</small><strong id="price">$34.95</strong></div></div>
-<button class="btn primary full" type="submit">Continue to SkyNoc Account →</button><p class="note">No payment is taken on this page. Final pricing, availability and order confirmation are handled through the SkyNoc account process.</p>
-</form></div>
 </div></section>
 
 <section class="section soft" id="why"><div class="container">
@@ -92,17 +78,6 @@ footer{background:#081225;color:#8d9bb0;padding:31px 0;font-size:11px}.foot{disp
 
 <footer><div class="container foot"><span>© <?=date('Y')?> SkyNoc. All rights reserved.</span><span><a href="/login">Account</a> · <a href="/reseller">Reseller Portal</a> · <a href="/api-docs">API Docs</a></span><div class="legal">SkyNoc is an independent WHMCS license reseller/platform and is not the official WHMCS website. WHMCS is a trademark of its respective owner. Pricing shown on this page is for reference and should be verified before purchase.</div></div></footer>
 
-<script>
-const prices={"Plus":"34.95","Professional":"54.95","Business 1000":"84.95","Business 2500":"179.95","Business 5000":"284.95","Business 10000":"399.95"};
-function pick(name){document.getElementById('plan').value=name;updatePrice()}
-function updatePrice(){const p=document.getElementById('plan').value;document.getElementById('price').textContent='$'+prices[p]}
-function saveConfig(e){
- e.preventDefault();
- const data={plan:document.getElementById('plan').value,name:document.getElementById('name').value.trim(),company:document.getElementById('company').value.trim(),domain:document.getElementById('domain').value.trim(),email:document.getElementById('email').value.trim(),billing_cycle:'monthly'};
- if(!data.name||!data.domain||!data.email){alert('Please enter your name, WHMCS domain and account email.');return}
- localStorage.setItem('skynoc_license_config',JSON.stringify(data));window.location.href='/login';
-}
-document.getElementById('plan').addEventListener('change',updatePrice);
-</script>
+
 </body>
 </html>
