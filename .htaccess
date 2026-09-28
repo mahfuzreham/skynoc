@@ -13,6 +13,9 @@ RewriteEngine On
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
+# Telegram control webhook
+RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
+
 # API
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
 
