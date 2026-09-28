@@ -109,6 +109,7 @@ function skynoclicense_CreateAccount($params)
     $result = skynoclicense_call($params, 'POST', 'orders', [
         'package_id' => $packageId,
         'domain' => $domain,
+        'external_ref' => 'whmcs_service_' . (int)($params['serviceid'] ?? 0),
     ]);
 
     if (!$result['ok']) {
