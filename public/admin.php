@@ -129,7 +129,11 @@ try {
             $status = $_POST['status'] ?? 'review';
             if (!in_array($status, ['pending','review','manual_reissue','completed','rejected'], true)) $status = 'review';
             $note = trim($_POST['admin_note']);
-            $s = $db->prepare('SELECT rr.*,l.license_key FROM reissue_requests rr JOIN licenses l ON l.id=rr.license_id WHERE rr.id=?');
+            $s = $db->prepare('SELECT rr.*,l.license_key,r.name reseller_name,r.email reseller_email
+                                      FROM reissue_requests rr
+                                      JOIN licenses l ON l.id=rr.license_id
+                                      JOIN resellers r ON r.id=rr.reseller_id
+                                      WHERE rr.id=?');
             $s->execute([$id]);
             $rr = $s->fetch();
             if (!$rr) throw new RuntimeException('Reissue request not found.');
@@ -142,7 +146,7 @@ try {
             notify_reseller((int)$rr['reseller_id'],'reissue','Reissue '.$status,'License '.$rr['license_key'].' reissue request is now '.strtoupper($status).'.'.($note ? ' Note: '.$note : ''));
             $db->commit();
             audit('reissue_'.$status,'reissue_requests',$id);
-            telegram_notify("📌 <b>REISSUE UPDATED</b>\nLicense: ".e($rr['license_key'])."\nStatus: ".e(strtoupper($status)));
+            skynoc_license_telegram_send("📌 <b>REISSUE UPDATED</b>\nLicense: ".e($rr['license_key'])."\nStatus: ".e(strtoupper($status)));
             $msg = 'Reissue updated.';
         }
 
@@ -176,9 +180,24 @@ try {
         }
 
         if ($a === 'telegram' && $u['role'] === 'owner') {
-            $s = $db->prepare('INSERT INTO telegram_settings(id,bot_token,admin_chat_id) VALUES(1,?,?) ON DUPLICATE KEY UPDATE bot_token=VALUES(bot_token),admin_chat_id=VALUES(admin_chat_id)');
-            $s->execute([trim($_POST['bot_token']),trim($_POST['admin_chat_id'])]);
-            $msg = 'Telegram settings saved.';
+            $licenseToken = trim((string)($_POST['license_bot_token'] ?? ''));
+            $licenseChat = trim((string)($_POST['license_admin_chat_id'] ?? ''));
+            $depositToken = trim((string)($_POST['deposit_bot_token'] ?? ''));
+            $depositChat = trim((string)($_POST['deposit_admin_chat_id'] ?? ''));
+            if ($licenseToken === '' || $licenseChat === '') {
+                throw new RuntimeException('License control bot token and admin chat ID are required.');
+            }
+            $s = $db->prepare('INSERT INTO telegram_settings(id,bot_token,admin_chat_id,license_bot_token,license_admin_chat_id,deposit_bot_token,deposit_admin_chat_id)
+                VALUES(1,?,?,?,?,?,?)
+                ON DUPLICATE KEY UPDATE
+                bot_token=VALUES(bot_token),
+                admin_chat_id=VALUES(admin_chat_id),
+                license_bot_token=VALUES(license_bot_token),
+                license_admin_chat_id=VALUES(license_admin_chat_id),
+                deposit_bot_token=VALUES(deposit_bot_token),
+                deposit_admin_chat_id=VALUES(deposit_admin_chat_id)');
+            $s->execute([$licenseToken,$licenseChat,$licenseToken,$licenseChat,$depositToken ?: null,$depositChat ?: null]);
+            $msg = 'Telegram bot settings saved.';
         }
     }
 } catch (Throwable $e) {
@@ -214,7 +233,21 @@ $tickets = $db->query('SELECT t.*,r.name reseller_name FROM tickets t LEFT JOIN 
 <?php if(can('staff.manage',$u)):?><div class="card"><h3>Create Staff</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="staff"><input name="name" placeholder="Name" required><input name="email" type="email" placeholder="Login email" required><input name="password" type="password" placeholder="Password (10+ chars)" required><select name="role"><option>staff</option><option>manager</option><option>admin</option></select><div class="checks"><?php foreach(['provider.manage','license.manage','reseller.manage','reissue.manage','api.manage','staff.manage','ticket.manage'] as $perm):?><label><input type="checkbox" name="perm[<?=e($perm)?>]" style="width:auto"> <?=e($perm)?></label><?php endforeach;?></div><button>Create Staff</button></form></div><?php endif;?>
 <?php if(can('license.manage',$u)):?><div class="card"><h3>Add License</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="license"><input name="license_key" placeholder="License key" required><input name="domain" placeholder="Domain"><select name="provider_account_id"><option value="">Provider</option><?php foreach($providers as $p):?><option value="<?=$p['id']?>"><?=e($p['provider_name'].' — '.$p['account_label'])?></option><?php endforeach;?></select><select name="reseller_id"><option value="">Unassigned</option><?php foreach($resellers as $r):?><option value="<?=$r['id']?>"><?=e($r['name'])?></option><?php endforeach;?></select><select name="status"><option>available</option><option>active</option><option>suspended</option><option>expired</option><option>cancelled</option></select><input name="purchase_date" type="date"><input name="cost" type="number" step="0.01" placeholder="Cost"><input name="expires_at" type="datetime-local"><button>Add License</button></form></div><?php endif;?>
 <?php if(can('api.manage',$u)):?><div class="card"><h3>Create API Key</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="api_key"><select name="reseller_id" required><?php foreach($resellers as $r):?><option value="<?=$r['id']?>"><?=e($r['name'])?></option><?php endforeach;?></select><input name="name" placeholder="Key name"><input name="expires_at" type="datetime-local"><div class="checks"><label><input type="checkbox" name="scope[licenses:read]" checked style="width:auto"> licenses:read</label><label><input type="checkbox" name="scope[reissue:create]" checked style="width:auto"> reissue:create</label><label><input type="checkbox" name="scope[reissue:read]" checked style="width:auto"> reissue:read</label></div><button>Generate API Key</button></form></div><?php endif;?>
-<?php if($u['role']==='owner'):?><div class="card"><h3>Telegram</h3><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="telegram"><input name="bot_token" placeholder="Bot token" required><input name="admin_chat_id" placeholder="Admin chat ID" required><button>Save Telegram</button></form></div><?php endif;?>
+<?php if($u['role']==='owner'):?>
+<div class="card"><h3>Telegram Bot Settings</h3>
+<p><b>License Control Bot</b> sends reissue/license alerts and provides Telegram admin controls.</p>
+<form method="post"><?=csrf_field()?><input type="hidden" name="action" value="telegram">
+<input name="license_bot_token" placeholder="License Control Bot Token" required>
+<input name="license_admin_chat_id" placeholder="License Admin Chat ID" required>
+<hr>
+<p><b>USDT Deposit Bot</b> is a separate bot used only for verified USDT BEP20 deposit notifications.</p>
+<input name="deposit_bot_token" placeholder="USDT Deposit Bot Token">
+<input name="deposit_admin_chat_id" placeholder="USDT Deposit Admin Chat ID">
+<button>Save Telegram Settings</button>
+</form>
+<small>Control webhook: /telegram/control</small>
+</div>
+<?php endif;?>
 </div>
 
 <h2>Licenses</h2><div class="table-wrap"><table><tr><th>ID</th><th>License</th><th>Domain</th><th>Provider</th><th>Reseller</th><th>Status</th><th>Controls</th></tr><?php foreach($licenses as $l):?><tr><td><?=$l['id']?></td><td><?=e($l['license_key'])?></td><td><?=e($l['domain'])?></td><td><?=e($l['provider_name'])?></td><td><?=e($l['reseller_name'])?></td><td><?=e($l['status'])?></td><td><?php if(can('license.manage',$u)):?><form method="post" class="inline"><?=csrf_field()?><input type="hidden" name="action" value="license_status"><input type="hidden" name="id" value="<?=$l['id']?>"><select name="status"><?php foreach(['available','active','suspended','expired','cancelled'] as $st):?><option <?=$l['status']===$st?'selected':''?>><?=$st?></option><?php endforeach;?></select><button>Save</button></form><form method="post" class="inline"><?=csrf_field()?><input type="hidden" name="action" value="reassign_license"><input type="hidden" name="id" value="<?=$l['id']?>"><select name="reseller_id"><option value="">Unassigned</option><?php foreach($resellers as $r):?><option value="<?=$r['id']?>" <?=$l['reseller_id']==$r['id']?'selected':''?>><?=e($r['name'])?></option><?php endforeach;?></select><button>Assign</button></form><?php endif;?></td></tr><?php endforeach;?></table></div>
