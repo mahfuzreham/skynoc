@@ -34,7 +34,7 @@ function notify_reseller(int $resellerId, string $type, string $title, string $m
     $s->execute([$resellerId,$type,$title,$message]);
 }
 function api_has_scope(array $key, string $scope): bool {
-    $scopes=array_filter(array_map('trim',explode(',',(string)($key['scopes'] ?? '')));
+    $scopes=array_filter(array_map('trim',explode(',',(string)($key['scopes'] ?? ''))));
     return in_array($scope,$scopes,true);
 }
 function audit(string $action, ?string $entity=null, ?int $entityId=null, ?string $details=null): void { global $db; $u=current_user(); $s=$db->prepare('INSERT INTO audit_logs(user_id,action,entity,entity_id,details,ip_address) VALUES(?,?,?,?,?,?)'); $s->execute([$u['id'] ?? null,$action,$entity,$entityId,$details,$_SERVER['REMOTE_ADDR'] ?? null]); }
