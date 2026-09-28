@@ -83,6 +83,19 @@ function skynoc_migrate(PDO $db): void
             "ALTER TABLE orders ADD UNIQUE KEY uq_orders_reseller_external (reseller_id,external_ref)"
         ];
 
+
+        $migrations['2026_09_28_usdt_bep20_deposits'] = [
+            "ALTER TABLE deposit_requests ADD COLUMN network VARCHAR(30) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN tx_hash VARCHAR(66) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN block_number BIGINT UNSIGNED NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN from_address CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN to_address CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN token_contract CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN token_amount DECIMAL(36,18) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN verified_at DATETIME NULL",
+            "ALTER TABLE deposit_requests ADD UNIQUE KEY uq_deposit_tx_hash (tx_hash)"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
