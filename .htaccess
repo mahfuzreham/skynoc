@@ -1,0 +1,9 @@
+Options -Indexes
+RewriteEngine On
+
+# API endpoints live outside the public UI directory.
+RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
+
+# Web UI entry points.
+RewriteRule ^$ public/index.php [L]
+RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ public/$1.php [L]
