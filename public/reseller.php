@@ -53,7 +53,7 @@ try {
                     ]);
                     $depositId=(int)$db->lastInsertId();
 
-                    wallet_credit($rid,$amount,$type,'DEPOSIT-'.$depositId,'Verified USDT BEP20 deposit #'.$depositId,$orderId=null,$createdBy=null);
+                    wallet_credit($rid,$amount,$type,'DEPOSIT-'.$depositId,'Verified USDT BEP20 deposit #'.$depositId,null,null);
 
                     if($lockedStatus==='pending'){
                         $db->prepare('UPDATE resellers SET status="active" WHERE id=?')->execute([$rid]);
