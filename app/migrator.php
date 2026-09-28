@@ -96,6 +96,15 @@ function skynoc_migrate(PDO $db): void
             "ALTER TABLE deposit_requests ADD UNIQUE KEY uq_deposit_tx_hash (tx_hash)"
         ];
 
+        $migrations['2026_09_28_telegram_separate_bots'] = [
+            "ALTER TABLE telegram_settings ADD COLUMN license_bot_token VARCHAR(255) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN license_admin_chat_id VARCHAR(64) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN deposit_bot_token VARCHAR(255) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN deposit_admin_chat_id VARCHAR(64) NULL",
+            "UPDATE telegram_settings SET license_bot_token=bot_token WHERE id=1 AND (license_bot_token IS NULL OR license_bot_token='')",
+            "UPDATE telegram_settings SET license_admin_chat_id=admin_chat_id WHERE id=1 AND (license_admin_chat_id IS NULL OR license_admin_chat_id='')"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
