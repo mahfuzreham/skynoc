@@ -19,6 +19,7 @@ RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
 # Public application routes
 RewriteRule ^$ public/index.php [L]
 RewriteRule ^login/?$ public/login.php [L,QSA]
+RewriteRule ^reseller/register/?$ public/reseller-register.php [L,QSA]
 RewriteRule ^logout/?$ public/logout.php [L,QSA]
 RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
 RewriteRule ^admin/?$ public/admin.php [L,QSA]
