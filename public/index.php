@@ -44,7 +44,7 @@ footer{background:#0f172a;color:#94a3b8;padding:35px 0}footer .container{display
 <div class="eyebrow"><span class="dot"></span> WHMCS LICENSE SALES</div>
 <h1>Choose the right <span>WHMCS license</span> for your business.</h1>
 <p>Browse license tiers, configure your deployment details and continue through your SkyNoc account. Built for hosting providers, agencies and WHMCS resellers.</p>
-<div class="actions"><a class="btn primary" href="#plans">View License Plans</a><a class="btn secondary" href="/login">Reseller Login</a></div>
+<div class="actions"><a class="btn primary" href="#plans">View License Plans</a><a class="btn secondary" href="#configure">Buy With SkyNoc</a><a class="btn secondary" href="https://www.whmcs.com/members/aff.php?aff=42837" target="_blank" rel="noopener noreferrer">Buy Direct from WHMCS</a></div>
 </div>
 
 <div class="orderbox" id="configure">
@@ -79,7 +79,7 @@ footer{background:#0f172a;color:#94a3b8;padding:35px 0}footer .container{display
 <div class="plan featured"><span class="badge">POPULAR</span><h3>Professional</h3><div class="limit">Up to 500 active clients</div><div class="amount">$54.95 <small>/ month</small></div><ul><li>Self-hosted</li><li>Email support</li><li>No branding</li></ul><a class="btn primary full" href="#configure" onclick="pick('Professional')">Configure Professional</a></div>
 <div class="plan"><h3>Business</h3><div class="limit">1,000+ active clients</div><div class="amount">From $84.95 <small>/ month</small></div><ul><li>Self-hosted</li><li>Email &amp; live chat support</li><li>Priority support access</li></ul><a class="btn secondary full" href="#configure" onclick="pick('Business 1000')">Configure Business</a></div>
 </div>
-<p class="source">Pricing reference: <a href="https://www.whmcs.com/pricing/" target="_blank" rel="noopener">WHMCS official pricing</a>. Prices can change; verify before purchase.</p>
+<p class="source">Want to purchase directly from WHMCS? <a href="https://www.whmcs.com/members/aff.php?aff=42837" target="_blank" rel="noopener noreferrer">Buy Direct from WHMCS</a> &nbsp;•&nbsp; Pricing reference: <a href="https://www.whmcs.com/pricing/" target="_blank" rel="noopener">WHMCS official pricing</a>. Prices can change; verify before purchase.</p>
 </div></section>
 
 <section class="section alt" id="features"><div class="container">
