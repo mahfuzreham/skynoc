@@ -54,6 +54,7 @@ if ($method === 'POST' && preg_match('#/orders/?$#',$path)) {
     $data=json_decode(file_get_contents('php://input'),true) ?: [];
     $packageId=(int)($data['package_id'] ?? 0);
     $domain=trim((string)($data['domain'] ?? ''));
+    $externalRef=trim((string)($data['external_ref'] ?? '')) ?: null;
     if($packageId<=0) json_response(['error'=>'package_id_required'],422);
     if($domain==='') json_response(['error'=>'domain_required'],422);
     try {
@@ -62,8 +63,12 @@ if ($method === 'POST' && preg_match('#/orders/?$#',$path)) {
         if(!$package) throw new RuntimeException('package_not_found');
         $q=$db->prepare('SELECT status FROM resellers WHERE id=? FOR UPDATE'); $q->execute([$key['reseller_id']]); $rs=$q->fetch();
         if(!$rs || $rs['status']!=='active') throw new RuntimeException('reseller_not_active');
-        $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source) VALUES(?,?,?,?,"pending","api")');
-        $price=(float)$package['price']; $q->execute([$key['reseller_id'],$packageId,$domain,$price]); $orderId=(int)$db->lastInsertId();
+        if($externalRef!==null){
+            $q=$db->prepare('SELECT id,amount,status FROM orders WHERE reseller_id=? AND external_ref=? LIMIT 1'); $q->execute([$key['reseller_id'],$externalRef]); $existing=$q->fetch();
+            if($existing){ $db->commit(); json_response(['message'=>'order_already_exists','order_id'=>(int)$existing['id'],'amount'=>(float)$existing['amount'],'status'=>$existing['status']],200); }
+        }
+        $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source,external_ref) VALUES(?,?,?,?,"pending","api",?)');
+        $price=(float)$package['price']; $q->execute([$key['reseller_id'],$packageId,$domain,$price,$externalRef]); $orderId=(int)$db->lastInsertId();
         wallet_debit((int)$key['reseller_id'],$price,'purchase','ORDER-'.$orderId,'API package purchase: '.$package['name'],$orderId,null);
         $db->commit();
         telegram_notify("🛒 <b>NEW API ORDER</b>\\nReseller: ".e($key['reseller_name'])."\\nOrder: ".$orderId."\\nPackage: ".e($package['name'])."\\nAmount: $".number_format($price,2)."\\nDomain: ".e($domain));
