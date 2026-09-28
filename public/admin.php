@@ -167,7 +167,8 @@ try {
     }
 } catch (Throwable $e) {
     if ($db->inTransaction()) $db->rollBack();
-    $error = $e->getCode() === '23000' ? 'This email or value already exists.' : $e->getMessage();
+    $error = $e->getCode() === '23000' ? 'This email or value already exists.' : 'The request could not be completed. Please check the server error log.';
+    error_log('SkyNoc admin error: ' . $e->getMessage());
 }
 
 $providers = $db->query('SELECT id,provider_name,account_email,account_label,status FROM provider_accounts ORDER BY id DESC')->fetchAll();
