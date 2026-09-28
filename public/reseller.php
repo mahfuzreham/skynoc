@@ -23,7 +23,8 @@ try {
             $method=trim((string)($_POST['method'] ?? ''));
             $reference=trim((string)($_POST['reference'] ?? '')) ?: null;
             $note=trim((string)($_POST['note'] ?? '')) ?: null;
-            if($amount < 15) throw new RuntimeException('Minimum activation deposit is $15.00.');
+            if($resellerStatus==='pending' && $amount < 15) throw new RuntimeException('Minimum activation deposit is $15.00.');
+            if($resellerStatus==='active' && $amount <= 0) throw new RuntimeException('Deposit amount must be positive.');
             if($method==='') throw new RuntimeException('Please select a payment method.');
             $q=$db->prepare('INSERT INTO deposit_requests(reseller_id,amount,method,reference,note) VALUES(?,?,?,?,?)');
             $q->execute([$rid,$amount,$method,$reference,$note]);
@@ -68,6 +69,7 @@ try {
         }
 
         if ($action === 'api_create') {
+            if($resellerStatus!=='active') throw new RuntimeException('Activate your reseller account before creating API keys.');
             $plain='skynoc_'.bin2hex(random_bytes(24));
             $scopes='licenses:read,reissue:create,reissue:read,packages:read,orders:create,orders:read';
             $s=$db->prepare('INSERT INTO api_keys(reseller_id,name,key_prefix,key_hash,scopes,expires_at) VALUES(?,?,?,?,?,?)');
