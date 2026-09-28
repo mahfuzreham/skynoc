@@ -150,7 +150,7 @@ try {
             $rid = (int)$_POST['reseller_id'];
             $plain = 'skynoc_' . bin2hex(random_bytes(24));
             $scopes = [];
-            foreach (['licenses:read','reissue:create','reissue:read'] as $scope) if (isset($_POST['scope'][$scope])) $scopes[] = $scope;
+            foreach (['licenses:read','reissue:create','reissue:read','packages:read','orders:create','orders:read'] as $scope) if (isset($_POST['scope'][$scope])) $scopes[] = $scope;
             if (!$scopes) $scopes = ['licenses:read'];
             $s = $db->prepare('INSERT INTO api_keys(reseller_id,name,key_prefix,key_hash,scopes,expires_at) VALUES(?,?,?,?,?,?)');
             $s->execute([$rid,trim($_POST['name']) ?: 'API Key',substr($plain,0,15),hash('sha256',$plain),implode(',',$scopes),$_POST['expires_at'] ?: null]);
