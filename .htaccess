@@ -1,9 +1,17 @@
 Options -Indexes
 RewriteEngine On
 
-# API endpoints live outside the public UI directory.
+# API
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
 
-# Web UI entry points.
+# Public application routes
 RewriteRule ^$ public/index.php [L]
-RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ public/$1.php [L]
+RewriteRule ^login/?$ public/login.php [L,QSA]
+RewriteRule ^logout/?$ public/logout.php [L,QSA]
+RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
+RewriteRule ^admin/?$ public/admin.php [L,QSA]
+RewriteRule ^reseller/?$ public/reseller.php [L,QSA]
+RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
+
+# Backward-compatible legacy .php routes
+RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ /$1 [R=301,L]
