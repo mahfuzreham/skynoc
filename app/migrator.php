@@ -78,6 +78,11 @@ function skynoc_migrate(PDO $db): void
             "CREATE TABLE IF NOT EXISTS orders (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,package_id BIGINT UNSIGNED NOT NULL,license_id BIGINT UNSIGNED NULL,domain VARCHAR(255) NULL,amount DECIMAL(14,2) NOT NULL,status ENUM('pending','processing','completed','rejected','refunded') NOT NULL DEFAULT 'pending',source ENUM('portal','api','whmcs_module','admin') NOT NULL DEFAULT 'portal',notes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,completed_at DATETIME NULL,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE RESTRICT,FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE SET NULL,INDEX idx_orders_reseller (reseller_id,created_at),INDEX idx_orders_status (status)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
 
+        $migrations['2026_09_28_order_idempotency'] = [
+            "ALTER TABLE orders ADD COLUMN external_ref VARCHAR(190) NULL",
+            "ALTER TABLE orders ADD UNIQUE KEY uq_orders_reseller_external (reseller_id,external_ref)"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
