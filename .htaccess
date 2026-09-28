@@ -1,6 +1,18 @@
 Options -Indexes
 RewriteEngine On
 
+# Never expose application internals, configuration, database dumps, or storage files.
+<FilesMatch "^(config\.php|config\.example\.php|schema\.sql|migration_existing\.sql|\.env.*)$">
+    Require all denied
+</FilesMatch>
+
+<IfModule mod_headers.c>
+    Header always set X-Content-Type-Options "nosniff"
+    Header always set X-Frame-Options "SAMEORIGIN"
+    Header always set Referrer-Policy "strict-origin-when-cross-origin"
+    Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
+</IfModule>
+
 # API
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
 
@@ -15,3 +27,6 @@ RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
 
 # Backward-compatible legacy .php routes
 RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ /$1 [R=301,L]
+
+# Block direct access to non-public application directories.
+RewriteRule ^(?:app|config|database|storage|bin)(?:/|$) - [F,L]
