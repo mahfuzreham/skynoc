@@ -165,6 +165,9 @@ function skynoc_migrate(PDO $db): void
             "CREATE TABLE IF NOT EXISTS white_label_settings (reseller_id BIGINT UNSIGNED PRIMARY KEY,company_name VARCHAR(160) NULL,logo_url VARCHAR(500) NULL,support_email VARCHAR(190) NULL,website_url VARCHAR(500) NULL,brand_color VARCHAR(20) NULL,custom_domain VARCHAR(255) NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "CREATE TABLE IF NOT EXISTS cron_runs (job VARCHAR(80) PRIMARY KEY,last_run_at DATETIME NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(60) NULL",
+            "ALTER TABLE licenses ADD COLUMN package_id BIGINT UNSIGNED NULL",
+            "ALTER TABLE licenses ADD INDEX idx_license_package(package_id)",
+            "ALTER TABLE licenses ADD CONSTRAINT fk_license_package FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE SET NULL",
             "ALTER TABLE orders ADD COLUMN coupon_discount DECIMAL(14,2) NOT NULL DEFAULT 0.00",
             "UPDATE api_keys SET scopes=CONCAT(scopes,',licenses:manage') WHERE scopes NOT LIKE '%licenses:manage%'"
         ];
