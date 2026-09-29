@@ -29,7 +29,7 @@ try {
             $paymentMethod = payment_method($method);
             if(!$paymentMethod || !(int)$paymentMethod['enabled']) throw new RuntimeException('This payment method is currently unavailable.');
             $minimumDeposit = payment_method_min($method, $resellerStatus==='pending');
-            if($amount < $minimumDeposit) throw new RuntimeException('Minimum deposit for '.(string)$paymentMethod['name'].' is 
+            if($amount < $minimumDeposit) throw new RuntimeException('Minimum deposit for '.(string)$paymentMethod['name'].' is $'.number_format($minimumDeposit,2).'.');
             if ($method === 'USDT_BEP20') {
                 if (!$reference) throw new RuntimeException('USDT TXID is required.');
                 $verified = verify_bsc_usdt_tx($reference, number_format($amount, 8, '.', ''));
