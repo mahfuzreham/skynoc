@@ -39,3 +39,6 @@ RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
 RewriteRule ^reseller/levels/?$ public/reseller-levels.php [L,QSA]
 # Admin reseller level management
 RewriteRule ^admin/reseller-levels/?$ public/admin-reseller-levels.php [L,QSA]
+
+# Central admin settings
+RewriteRule ^admin/settings/?$ public/admin-settings.php [L,QSA]
