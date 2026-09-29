@@ -306,8 +306,9 @@ $telegramSettings = $db->query('SELECT * FROM telegram_settings WHERE id=1 LIMIT
                 if($licenseId<=0) throw new RuntimeException('Select a license to fulfill this order.');
                 $q=$db->prepare('SELECT id,reseller_id,status,domain FROM licenses WHERE id=? FOR UPDATE'); $q->execute([$licenseId]); $lic=$q->fetch();
                 if(!$lic || $lic['reseller_id']!==null || $lic['status']!=='available') throw new RuntimeException('Selected license is not available.');
-                $db->prepare('UPDATE licenses SET reseller_id=?,domain=?,status="active",purchase_date=CURDATE() WHERE id=?')->execute([$o['reseller_id'],$o['domain'],$licenseId]);
+                $db->prepare('UPDATE licenses SET reseller_id=?,domain=?,status="active",purchase_date=CURDATE(),package_id=? WHERE id=?')->execute([$o['reseller_id'],$o['domain'],$o['package_id'],$licenseId]);
                 $db->prepare('UPDATE orders SET status="completed",license_id=?,notes=?,completed_at=NOW() WHERE id=?')->execute([$licenseId,$note,$id]);
+                platform_invoice_for_order($id);
                 notify_reseller((int)$o['reseller_id'],'order','Order completed','Order #'.$id.' for '.$o['package_name'].' has been completed.');
             } elseif($status==='rejected'){
                 $db->prepare('UPDATE orders SET status="rejected",notes=? WHERE id=?')->execute([$note,$id]);
