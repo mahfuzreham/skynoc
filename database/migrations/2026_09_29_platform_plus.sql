@@ -1,0 +1,87 @@
+-- SkyNoc platform-plus schema extension
+CREATE TABLE IF NOT EXISTS user_2fa (
+  user_id BIGINT UNSIGNED PRIMARY KEY,
+  secret VARCHAR(64) NOT NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  recovery_codes TEXT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS coupons (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  code VARCHAR(60) NOT NULL UNIQUE,
+  type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',
+  value DECIMAL(14,2) NOT NULL,
+  max_uses INT UNSIGNED NULL,
+  used_count INT UNSIGNED NOT NULL DEFAULT 0,
+  starts_at DATETIME NULL,
+  expires_at DATETIME NULL,
+  active TINYINT(1) NOT NULL DEFAULT 1,
+  created_by BIGINT UNSIGNED NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,
+  INDEX idx_coupons_active (active,starts_at,expires_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS coupon_redemptions (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  coupon_id BIGINT UNSIGNED NOT NULL,
+  reseller_id BIGINT UNSIGNED NOT NULL,
+  order_id BIGINT UNSIGNED NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(coupon_id) REFERENCES coupons(id) ON DELETE CASCADE,
+  FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  UNIQUE KEY uq_coupon_order (coupon_id,order_id),
+  INDEX idx_coupon_reseller (coupon_id,reseller_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS invoices (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  invoice_number VARCHAR(40) NOT NULL UNIQUE,
+  reseller_id BIGINT UNSIGNED NOT NULL,
+  order_id BIGINT UNSIGNED NULL,
+  subtotal DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  discount DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  total DECIMAL(14,2) NOT NULL DEFAULT 0.00,
+  status ENUM('unpaid','paid','cancelled','refunded') NOT NULL DEFAULT 'paid',
+  due_at DATETIME NULL,
+  paid_at DATETIME NULL,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+  FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+  FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,
+  INDEX idx_invoice_reseller (reseller_id,created_at),
+  INDEX idx_invoice_order (order_id)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS invoice_items (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  invoice_id BIGINT UNSIGNED NOT NULL,
+  description VARCHAR(255) NOT NULL,
+  quantity DECIMAL(14,2) NOT NULL DEFAULT 1.00,
+  unit_price DECIMAL(14,2) NOT NULL,
+  amount DECIMAL(14,2) NOT NULL,
+  FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS white_label_settings (
+  reseller_id BIGINT UNSIGNED PRIMARY KEY,
+  company_name VARCHAR(160) NULL,
+  logo_url VARCHAR(500) NULL,
+  support_email VARCHAR(190) NULL,
+  website_url VARCHAR(500) NULL,
+  brand_color VARCHAR(20) NULL,
+  custom_domain VARCHAR(255) NULL,
+  enabled TINYINT(1) NOT NULL DEFAULT 0,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+  FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE IF NOT EXISTS cron_runs (
+  job VARCHAR(80) PRIMARY KEY,
+  last_run_at DATETIME NULL,
+  updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
