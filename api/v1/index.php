@@ -167,4 +167,17 @@ if ($method === 'GET' && preg_match('#/branding/?$#',$path)) {
     json_response(['data'=>$branding]);
 }
 
+if ($method === 'POST' && preg_match('#/licenses/(\\d+)/package$#',$path,$m)) {
+    if (!api_has_scope($key,'licenses:manage')) json_response(['error'=>'insufficient_scope'],403);
+    $data=json_decode(file_get_contents('php://input'),true) ?: []; $packageId=(int)($data['package_id']??0);
+    if($packageId<=0) json_response(['error'=>'package_id_required'],422);
+    $p=$db->prepare('SELECT id,name,active FROM packages WHERE id=? AND active=1 LIMIT 1');$p->execute([$packageId]);$pkg=$p->fetch();
+    if(!$pkg) json_response(['error'=>'package_not_found'],404);
+    $s=$db->prepare('SELECT id,package_id FROM licenses WHERE id=? AND reseller_id=? LIMIT 1');$s->execute([(int)$m[1],$key['reseller_id']]);$lic=$s->fetch();
+    if(!$lic) json_response(['error'=>'license_not_found'],404);
+    $db->beginTransaction();
+    try{$db->prepare('UPDATE licenses SET package_id=? WHERE id=? AND reseller_id=?')->execute([$packageId,$lic['id'],$key['reseller_id']]);$db->prepare('INSERT INTO license_history(license_id,action,notes) VALUES(?,?,?)')->execute([$lic['id'],'package_changed','Package changed from '.($lic['package_id']?:'none').' to '.$packageId]);$db->commit();}catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    json_response(['message'=>'package_updated','license_id'=>(int)$lic['id'],'package_id'=>$packageId,'package_name'=>$pkg['name']]);
+}
+
 json_response(['error'=>'endpoint_not_found'],404);
