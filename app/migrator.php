@@ -146,6 +146,16 @@ function skynoc_migrate(PDO $db): void
             ('Manual','Manual Payment',0,15.00,'Contact SkyNoc support for manual payment instructions.',0,5)"
         ];
 
+        $migrations['2026_09_29_level_discounts'] = [
+            "CREATE TABLE IF NOT EXISTS reseller_level_discounts (
+                level TINYINT UNSIGNED PRIMARY KEY,
+                discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT IGNORE INTO reseller_level_discounts(level,discount_percent) VALUES
+                (1,0.00),(2,0.00),(3,0.00),(4,0.00),(5,0.00)"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
