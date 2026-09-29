@@ -28,6 +28,9 @@ RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
 RewriteRule ^admin/?$ public/admin.php [L,QSA]
 RewriteRule ^reseller/?$ public/reseller.php [L,QSA]
 RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
+RewriteRule ^security/?$ public/security.php [L,QSA]
+RewriteRule ^admin/reports/?$ public/reports.php [L,QSA]
+RewriteRule ^cron/?$ public/cron.php [L,QSA]
 
 # Backward-compatible legacy .php routes
 RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ /$1 [R=301,L]
