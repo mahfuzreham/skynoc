@@ -35,7 +35,7 @@ try {
         }
 
         if ($a === 'provider' && can('provider.manage', $u)) {
-(provider_type,provider_name,account_email,account_label,internal_notes) VALUES(?,?,?,?,?)');
+            $s = $db->prepare('INSERT INTO provider_accounts(provider_type,provider_name,account_email,account_label,internal_notes) VALUES(?,?,?,?,?)');
             $s->execute([
                 $_POST['provider_type'] ?: 'MANUAL_PARTNER',
                 trim($_POST['provider_name']),
