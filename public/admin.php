@@ -24,11 +24,18 @@ try {
                 $type=($rs==='pending') ? 'activation_deposit' : 'deposit';
                 $db->prepare('UPDATE deposit_requests SET status="approved",reviewed_by=?,review_note=? WHERE id=?')->execute([$u['id'],$note,$id]);
                 wallet_credit((int)$d['reseller_id'],(float)$d['amount'],$type,'DEPOSIT-'.$id,'Approved reseller deposit #'.$id,null,$u['id']);
-                if($rs==='pending'){
-                    $db->prepare('UPDATE resellers SET status="active" WHERE id=?')->execute([$d['reseller_id']]);
-                }
-                notify_reseller((int)$d['reseller_id'],'wallet','Deposit approved','Your 
-            $s = $db->prepare('INSERT INTO provider_accounts(provider_type,provider_name,account_email,account_label,internal_notes) VALUES(?,?,?,?,?)');
+                if($rs==='pending') $db->prepare('UPDATE resellers SET status="active" WHERE id=?')->execute([$d['reseller_id']]);
+                notify_reseller((int)$d['reseller_id'],'wallet','Deposit approved','Your deposit #'.$id.' has been approved and credited to your wallet.');
+            } else {
+                $db->prepare('UPDATE deposit_requests SET status="rejected",reviewed_by=?,review_note=? WHERE id=?')->execute([$u['id'],$note,$id]);
+                notify_reseller((int)$d['reseller_id'],'wallet','Deposit rejected','Your deposit #'.$id.' was rejected.'.($note?' Note: '.$note:''));
+            }
+            $db->commit(); audit('deposit_'.$status,'deposit_requests',$id);
+            $msg='Deposit review completed.';
+        }
+
+        if ($a === 'provider' && can('provider.manage', $u)) {
+(provider_type,provider_name,account_email,account_label,internal_notes) VALUES(?,?,?,?,?)');
             $s->execute([
                 $_POST['provider_type'] ?: 'MANUAL_PARTNER',
                 trim($_POST['provider_name']),
