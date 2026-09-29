@@ -107,7 +107,7 @@ try {
             $q=$db->prepare('SELECT wallet_balance FROM resellers WHERE id=? FOR UPDATE');
             $q->execute([$rid]);
             $balance=(float)$q->fetchColumn();
-            $price=(float)$package['price'];
+            $price=reseller_package_price((float)$package['price'],reseller_level($rid)['assigned_level']);
             if($balance < $price) throw new RuntimeException('Insufficient wallet balance. Please deposit funds first.');
             $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source) VALUES(?,?,?,?,"pending","portal")');
             $q->execute([$rid,$packageId,$domain,$price]);
