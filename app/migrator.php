@@ -105,6 +105,25 @@ function skynoc_migrate(PDO $db): void
             "UPDATE telegram_settings SET license_admin_chat_id=admin_chat_id WHERE id=1 AND (license_admin_chat_id IS NULL OR license_admin_chat_id='')"
         ];
 
+        $migrations['2026_09_29_reseller_levels'] = [
+            "ALTER TABLE resellers ADD COLUMN level_mode ENUM('auto','custom') NOT NULL DEFAULT 'auto'",
+            "ALTER TABLE resellers ADD COLUMN custom_level TINYINT UNSIGNED NULL",
+            "ALTER TABLE resellers ADD COLUMN level_updated_at DATETIME NULL",
+            "CREATE TABLE IF NOT EXISTS reseller_level_history (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                reseller_id BIGINT UNSIGNED NOT NULL,
+                old_level TINYINT UNSIGNED NULL,
+                new_level TINYINT UNSIGNED NOT NULL,
+                mode ENUM('auto','custom') NOT NULL DEFAULT 'auto',
+                reason VARCHAR(255) NULL,
+                changed_by BIGINT UNSIGNED NULL,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,
+                FOREIGN KEY(changed_by) REFERENCES users(id) ON DELETE SET NULL,
+                INDEX idx_level_history_reseller (reseller_id,created_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
