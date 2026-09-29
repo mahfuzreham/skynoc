@@ -128,3 +128,14 @@ function reseller_level(int $resellerId): array {
         'progress' => $assigned >= 5 ? 100 : min(100, max(0, (int)round(($active / max(1, $next['min'])) * 100))),
     ];
 }
+
+function reseller_level_discount(int $level): float {
+    global $db;
+    $s=$db->prepare('SELECT discount_percent FROM reseller_level_discounts WHERE level=? LIMIT 1');
+    $s->execute([$level]);
+    return max(0.0,min(100.0,(float)($s->fetchColumn() ?? 0)));
+}
+function reseller_package_price(float $basePrice,int $level): float {
+    $discount=reseller_level_discount($level);
+    return round(max(0.0,$basePrice-($basePrice*$discount/100)),2);
+}
