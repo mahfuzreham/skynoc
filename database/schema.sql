@@ -17,3 +17,24 @@ CREATE TABLE wallet_transactions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
 CREATE TABLE deposit_requests (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,amount DECIMAL(14,2) NOT NULL,method VARCHAR(60) NOT NULL,reference VARCHAR(120) NULL,note TEXT NULL,status ENUM('pending','approved','rejected') NOT NULL DEFAULT 'pending',reviewed_by BIGINT UNSIGNED NULL,review_note TEXT NULL,network VARCHAR(30) NULL,tx_hash VARCHAR(66) NULL,block_number BIGINT UNSIGNED NULL,from_address CHAR(42) NULL,to_address CHAR(42) NULL,token_contract CHAR(42) NULL,token_amount DECIMAL(36,18) NULL,verified_at DATETIME NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(reviewed_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_deposit_status (status),INDEX idx_deposit_reseller (reseller_id),UNIQUE KEY uq_deposit_tx_hash (tx_hash)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE packages (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,name VARCHAR(120) NOT NULL,slug VARCHAR(120) NOT NULL UNIQUE,description TEXT NULL,price DECIMAL(14,2) NOT NULL,client_limit INT UNSIGNED NULL,billing_period VARCHAR(30) NOT NULL DEFAULT 'monthly',active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_packages_active_sort (active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
 CREATE TABLE orders (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,package_id BIGINT UNSIGNED NOT NULL,license_id BIGINT UNSIGNED NULL,domain VARCHAR(255) NULL,amount DECIMAL(14,2) NOT NULL,status ENUM('pending','processing','completed','rejected','refunded') NOT NULL DEFAULT 'pending',source ENUM('portal','api','whmcs_module','admin') NOT NULL DEFAULT 'portal',external_ref VARCHAR(190) NULL,notes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,completed_at DATETIME NULL,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE RESTRICT,FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE SET NULL,INDEX idx_orders_reseller (reseller_id,created_at),INDEX idx_orders_status (status),UNIQUE KEY uq_orders_reseller_external (reseller_id,external_ref)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+CREATE TABLE payment_methods (
+ id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+ code VARCHAR(60) NOT NULL UNIQUE,
+ name VARCHAR(120) NOT NULL,
+ enabled TINYINT(1) NOT NULL DEFAULT 1,
+ min_amount DECIMAL(14,2) NOT NULL DEFAULT 1.00,
+ instructions TEXT NULL,
+ auto_verify TINYINT(1) NOT NULL DEFAULT 0,
+ sort_order INT NOT NULL DEFAULT 0,
+ created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+ updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+ INDEX idx_payment_methods_enabled_sort (enabled,sort_order)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4;
+
+INSERT INTO payment_methods(code,name,enabled,min_amount,instructions,auto_verify,sort_order) VALUES
+('USDT_BEP20','USDT (BEP20 / BSC)',1,15.00,'Send USDT through BSC/BEP20 and submit the transaction hash. The blockchain transfer is verified automatically.',1,1),
+('bKash','bKash',1,15.00,'Pay using the SkyNoc-approved bKash payment instructions and submit the payment reference.',0,2),
+('Binance_Crypto','Binance / Crypto',1,15.00,'Follow the payment instructions provided by SkyNoc support and submit your payment reference.',0,3),
+('Bank_Transfer','Bank Transfer',1,15.00,'Complete the bank transfer and submit the transaction/reference number.',0,4),
+('Manual','Manual Payment',0,15.00,'Contact SkyNoc support for manual payment instructions.',0,5);
