@@ -308,7 +308,6 @@ $telegramSettings = $db->query('SELECT * FROM telegram_settings WHERE id=1 LIMIT
                 if(!$lic || $lic['reseller_id']!==null || $lic['status']!=='available') throw new RuntimeException('Selected license is not available.');
                 $db->prepare('UPDATE licenses SET reseller_id=?,domain=?,status="active",purchase_date=CURDATE(),package_id=? WHERE id=?')->execute([$o['reseller_id'],$o['domain'],$o['package_id'],$licenseId]);
                 $db->prepare('UPDATE orders SET status="completed",license_id=?,notes=?,completed_at=NOW() WHERE id=?')->execute([$licenseId,$note,$id]);
-                platform_invoice_for_order($id);
                 notify_reseller((int)$o['reseller_id'],'order','Order completed','Order #'.$id.' for '.$o['package_name'].' has been completed.');
             } elseif($status==='rejected'){
                 $db->prepare('UPDATE orders SET status="rejected",notes=? WHERE id=?')->execute([$note,$id]);
@@ -318,7 +317,7 @@ $telegramSettings = $db->query('SELECT * FROM telegram_settings WHERE id=1 LIMIT
                 $db->prepare('UPDATE orders SET status="processing",notes=? WHERE id=?')->execute([$note,$id]);
                 notify_reseller((int)$o['reseller_id'],'order','Order processing','Order #'.$id.' is now being processed.');
             }
-            $db->commit(); audit('order_'.$status,'orders',$id); $msg='Order updated.';
+            $db->commit(); if($status==='completed') platform_invoice_for_order($id); audit('order_'.$status,'orders',$id); $msg='Order updated.';
         }
 
         if ($a === 'provider' && can('provider.manage', $u)) {
