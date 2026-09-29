@@ -39,7 +39,7 @@ $method = $_SERVER['REQUEST_METHOD'];
 if ($method === 'GET' && preg_match('#/packages/?$#',$path)) {
     if (!api_has_scope($key,'packages:read')) json_response(['error'=>'insufficient_scope'],403);
     $s=$db->query('SELECT id,name,slug,description,price,client_limit,billing_period FROM packages WHERE active=1 ORDER BY sort_order,id');
-    json_response(['data'=>$s->fetchAll()]);
+    $packages=$s->fetchAll(); $lv=reseller_level((int)$key['reseller_id']); foreach($packages as &$pkg){ $pkg['base_price']=(float)$pkg['price']; $pkg['discount_percent']=reseller_level_discount($lv['assigned_level']); $pkg['price']=reseller_package_price((float)$pkg['price'],$lv['assigned_level']); } unset($pkg); json_response(['data'=>$packages,'reseller_level'=>$lv['assigned_level']]);
 }
 
 if ($method === 'GET' && preg_match('#/orders/?$#',$path)) {
@@ -68,7 +68,7 @@ if ($method === 'POST' && preg_match('#/orders/?$#',$path)) {
             if($existing){ $db->commit(); json_response(['message'=>'order_already_exists','order_id'=>(int)$existing['id'],'amount'=>(float)$existing['amount'],'status'=>$existing['status']],200); }
         }
         $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source,external_ref) VALUES(?,?,?,?,"pending","api",?)');
-        $price=(float)$package['price']; $q->execute([$key['reseller_id'],$packageId,$domain,$price,$externalRef]); $orderId=(int)$db->lastInsertId();
+        $lv=reseller_level((int)$key['reseller_id']); $price=reseller_package_price((float)$package['price'],$lv['assigned_level']); $q->execute([$key['reseller_id'],$packageId,$domain,$price,$externalRef]); $orderId=(int)$db->lastInsertId();
         wallet_debit((int)$key['reseller_id'],$price,'purchase','ORDER-'.$orderId,'API package purchase: '.$package['name'],$orderId,null);
         $db->commit();
         telegram_notify("🛒 <b>NEW API ORDER</b>\\nReseller: ".e($key['reseller_name'])."\\nOrder: ".$orderId."\\nPackage: ".e($package['name'])."\\nAmount: $".number_format($price,2)."\\nDomain: ".e($domain));
