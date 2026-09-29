@@ -17,6 +17,14 @@ try{
     $sort=(int)($_POST['sort_order'][$code]??$m['sort_order']);
     $config=json_decode((string)($_POST['config_json'][$code]??($m['config_json']?:'{}')),true);
     if(!is_array($config)) throw new RuntimeException('Invalid configuration for '.$m['name'].'.');
+    if($code==='USDT_BEP20'){
+        $config['receiving_address']=trim((string)($_POST['usdt_receiving_address']??''));
+        $config['rpc_url']=trim((string)($_POST['usdt_rpc_url']??'https://bsc-dataseed.bnbchain.org'));
+        $config['chain_id']=56;
+        $config['token_contract']=trim((string)($_POST['usdt_token_contract']??'0x55d398326f99059ff775485246999027b3197955'));
+        $config['decimals']=18;
+        $config['min_confirmations']=max(1,(int)($_POST['usdt_min_confirmations']??12));
+    }
     $s=$db->prepare('UPDATE payment_methods SET name=?,enabled=?,min_deposit=?,instructions=?,sort_order=?,config_json=? WHERE code=?');
     $s->execute([$name,$enabled,$min,$instructions,$sort,json_encode($config,JSON_UNESCAPED_SLASHES),$code]);
    }
@@ -46,7 +54,13 @@ $tg=$db->query('SELECT * FROM telegram_settings WHERE id=1 LIMIT 1')->fetch()?:[
 <?php foreach($methods as $m):$cfg=json_decode((string)($m['config_json']?:'{}'),true);if(!is_array($cfg))$cfg=[];?>
 <div class="method"><div class="head"><h3><?=e($m['name'])?> <small class="hint">(<?=e($m['code'])?>)</small></h3><label class="switch"><input type="checkbox" name="enabled[<?=e($m['code'])?>]" value="1" <?=$m['enabled']?'checked':''?>> Enabled</label></div>
 <div class="row"><div><label>Display Name</label><input name="name[<?=e($m['code'])?>]" value="<?=e($m['name'])?>"></div><div><label>Minimum Deposit (USD)</label><input name="min_deposit[<?=e($m['code'])?>]" type="number" step="0.01" min="0.01" value="<?=e((string)$m['min_deposit'])?>"></div><div><label>Sort Order</label><input name="sort_order[<?=e($m['code'])?>]" type="number" value="<?=e((string)$m['sort_order'])?>"></div><div class="wide"><label>Payment Instructions</label><textarea name="instructions[<?=e($m['code'])?>]"><?=e((string)$m['instructions'])?></textarea></div>
-<?php if($m['code']==='USDT_BEP20'):?><div><label>Receiving Address</label><input name="config_json[<?=e($m['code'])?>]" value="<?=e(json_encode($cfg,JSON_UNESCAPED_SLASHES))?>" placeholder='{"receiving_address":"0x...","min_confirmations":12,"rpc_url":"https://..."}'><div class="hint">JSON config: receiving_address, min_confirmations, rpc_url, chain_id, token_contract, decimals.</div></div><?php else:?><div class="wide"><label>Method Configuration JSON (optional)</label><input name="config_json[<?=e($m['code'])?>]" value="<?=e(json_encode($cfg,JSON_UNESCAPED_SLASHES))?>"></div><?php endif;?></div></div>
+<?php if($m['code']==='USDT_BEP20'):?>
+<div><label>Receiving Address</label><input name="usdt_receiving_address" value="<?=e((string)($cfg['receiving_address']??''))?>" placeholder="0x..."></div>
+<div><label>BSC RPC URL</label><input name="usdt_rpc_url" value="<?=e((string)($cfg['rpc_url']??'https://bsc-dataseed.bnbchain.org'))?>"></div>
+<div><label>Token Contract</label><input name="usdt_token_contract" value="<?=e((string)($cfg['token_contract']??'0x55d398326f99059ff775485246999027b3197955'))?>"></div>
+<div><label>Confirmations Required</label><input name="usdt_min_confirmations" type="number" min="1" value="<?=e((string)($cfg['min_confirmations']??12))?>"></div>
+<div class="wide"><div class="hint">BSC chain ID 56 · USDT BEP20 contract is configurable above. No private key or seed is stored.</div><input type="hidden" name="config_json[<?=e($m['code'])?>]" value="<?=e(json_encode($cfg,JSON_UNESCAPED_SLASHES))?>"></div>
+<?php else:?><div class="wide"><label>Method Configuration JSON (optional)</label><input name="config_json[<?=e($m['code'])?>]" value="<?=e(json_encode($cfg,JSON_UNESCAPED_SLASHES))?>"></div><?php endif;?></div></div>
 <?php endforeach;?><button>Save Payment Settings</button></form></div>
 <div class="card"><h2>🤖 Telegram</h2><p class="hint">Separate License Control and USDT Deposit bots.</p><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="telegram"><div class="row"><div><label>License Control Bot Token</label><input type="password" name="license_bot_token" value="<?=e((string)($tg['license_bot_token']??''))?>" autocomplete="off"></div><div><label>License Admin Chat ID</label><input name="license_admin_chat_id" value="<?=e((string)($tg['license_admin_chat_id']??''))?>"></div><div><label>Deposit Admin Chat ID</label><input name="deposit_admin_chat_id" value="<?=e((string)($tg['deposit_admin_chat_id']??''))?>"></div><div><label>USDT Deposit Bot Token</label><input type="password" name="deposit_bot_token" value="<?=e((string)($tg['deposit_bot_token']??''))?>" autocomplete="off"></div></div><button>Save Telegram Settings</button></form></div>
 <div class="card"><h2>🏆 Reseller Levels</h2><p class="hint">Automatic thresholds and custom admin overrides are managed separately.</p><p><b>Level 1:</b> 0–10 &nbsp; <b>Level 2:</b> 11–25 &nbsp; <b>Level 3:</b> 26–50 &nbsp; <b>Level 4:</b> 51–100 &nbsp; <b>Level 5:</b> 101+</p><a href="/admin/reseller-levels">Open Reseller Level Management →</a></div>
