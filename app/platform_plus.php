@@ -13,6 +13,13 @@ function platform_coupon(string $code, float $baseAmount): ?array {
     return ['id'=>(int)$c['id'],'code'=>$c['code'],'type'=>$c['type'],'value'=>(float)$c['value'],'discount'=>round($discount,2)];
 }
 
+function platform_redeem_coupon(int $couponId,int $resellerId,int $orderId,float $discount): void {
+    global $db;
+    if ($couponId<=0 || $discount<=0) return;
+    $db->prepare("INSERT INTO coupon_redemptions(coupon_id,reseller_id,order_id,amount) VALUES(?,?,?,?)")->execute([$couponId,$resellerId,$orderId,$discount]);
+    $db->prepare("UPDATE coupons SET used_count=used_count+1 WHERE id=?")->execute([$couponId]);
+}
+
 function platform_invoice_for_order(int $orderId): ?int {
     global $db;
     $s=$db->prepare("SELECT i.id FROM invoices i WHERE i.order_id=? LIMIT 1"); $s->execute([$orderId]);
@@ -22,10 +29,12 @@ function platform_invoice_for_order(int $orderId): ?int {
     $number='SN-'.date('Ym').'-'.str_pad((string)$orderId,7,'0',STR_PAD_LEFT);
     $db->beginTransaction();
     try {
+        $subtotal=(float)$o['amount']+(float)($o['coupon_discount']??0);
+        $discount=(float)($o['coupon_discount']??0);
         $q=$db->prepare("INSERT INTO invoices(invoice_number,reseller_id,order_id,subtotal,discount,total,status,paid_at) VALUES(?,?,?,?,?,?, 'paid',NOW())");
-        $q->execute([$number,$o['reseller_id'],$orderId,(float)$o['amount'],0,(float)$o['amount']]);
+        $q->execute([$number,$o['reseller_id'],$orderId,$subtotal,$discount,(float)$o['amount']]);
         $iid=(int)$db->lastInsertId();
-        $db->prepare("INSERT INTO invoice_items(invoice_id,description,quantity,unit_price,amount) VALUES(?,?,?,?,?)")->execute([$iid,'SkyNoc '.$o['package_name'],1,(float)$o['amount'],(float)$o['amount']]);
+        $db->prepare("INSERT INTO invoice_items(invoice_id,description,quantity,unit_price,amount) VALUES(?,?,?,?,?)")->execute([$iid,'SkyNoc '.$o['package_name'],1,$subtotal,$subtotal]);
         $db->commit(); return $iid;
     } catch(Throwable $e) { if($db->inTransaction())$db->rollBack(); return null; }
 }
