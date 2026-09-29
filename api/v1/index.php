@@ -127,4 +127,33 @@ if ($method === 'GET' && preg_match('#/reissues/?$#',$path)) {
     json_response(['data'=>$s->fetchAll()]);
 }
 
+if ($method === 'POST' && preg_match('#/licenses/(\\d+)/(suspend|unsuspend|terminate)$#',$path,$m)) {
+    if (!api_has_scope($key,'licenses:manage')) json_response(['error'=>'insufficient_scope'],403);
+    $id=(int)$m[1]; $action=$m[2];
+    $s=$db->prepare('SELECT id,license_key,domain,status FROM licenses WHERE id=? AND reseller_id=? LIMIT 1');
+    $s->execute([$id,$key['reseller_id']]); $lic=$s->fetch();
+    if(!$lic) json_response(['error'=>'license_not_found'],404);
+    $target=$action==='suspend'?'suspended':($action==='unsuspend'?'active':'cancelled');
+    if($action==='suspend' && $lic['status']==='cancelled') json_response(['error'=>'license_cancelled'],422);
+    $db->beginTransaction();
+    try {
+        $db->prepare('UPDATE licenses SET status=? WHERE id=? AND reseller_id=?')->execute([$target,$id,$key['reseller_id']]);
+        $db->prepare('INSERT INTO license_history(license_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?)')->execute([$id,$action,$lic['domain'],$lic['domain'],'API lifecycle action']);
+        $db->commit();
+    } catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    notify_reseller((int)$key['reseller_id'],'license','License status updated','License '.$lic['license_key'].' is now '.$target.'.');
+    json_response(['message'=>'license_updated','license_id'=>$id,'status'=>$target]);
+}
+
+if ($method === 'POST' && preg_match('#/licenses/(\\d+)/domain$#',$path,$m)) {
+    if (!api_has_scope($key,'licenses:manage')) json_response(['error'=>'insufficient_scope'],403);
+    $data=json_decode(file_get_contents('php://input'),true) ?: [];
+    $domain=trim((string)($data['domain']??'')); if($domain==='') json_response(['error'=>'domain_required'],422);
+    $s=$db->prepare('SELECT id,license_key,domain,status FROM licenses WHERE id=? AND reseller_id=? LIMIT 1');$s->execute([(int)$m[1],$key['reseller_id']]);$lic=$s->fetch();
+    if(!$lic) json_response(['error'=>'license_not_found'],404);
+    $db->beginTransaction();
+    try{$db->prepare('UPDATE licenses SET domain=? WHERE id=? AND reseller_id=?')->execute([$domain,$lic['id'],$key['reseller_id']]);$db->prepare('INSERT INTO license_history(license_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?)')->execute([$lic['id'],'domain_changed',$lic['domain'],$domain,'API domain change']);$db->commit();}catch(Throwable $e){if($db->inTransaction())$db->rollBack();throw $e;}
+    json_response(['message'=>'domain_updated','license_id'=>(int)$lic['id'],'domain'=>$domain]);
+}
+
 json_response(['error'=>'endpoint_not_found'],404);
