@@ -19,7 +19,8 @@ function skynoc_usdt_config(): array
         'min_confirmations' => 12,
     ];
     $local = is_array($config['usdt_bep20'] ?? null) ? $config['usdt_bep20'] : [];
-    return array_merge($defaults, $local);
+    $dbConfig = function_exists('payment_method_config') ? payment_method_config('USDT_BEP20') : [];
+    return array_merge($defaults, $local, $dbConfig);
 }
 
 function skynoc_bsc_rpc(string $method, array $params = []): mixed
