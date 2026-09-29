@@ -45,6 +45,7 @@ try {
 
 require_once __DIR__ . '/helpers.php';
 require_once __DIR__ . '/platform_plus.php';
+require_once __DIR__ . '/twofa.php';
 require_once __DIR__ . '/telegram.php';
 require_once __DIR__ . '/usdt.php';
 require_once __DIR__ . '/payment.php';
