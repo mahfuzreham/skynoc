@@ -120,21 +120,31 @@ function skynoclicense_CreateAccount($params)
     return 'success';
 }
 
+function skynoclicense_find_license($params)
+{
+    $ref='whmcs_service_'.(int)($params['serviceid']??0);
+    $result=skynoclicense_call($params,'GET','orders');
+    if(!$result['ok']) return $result;
+    foreach(($result['data']['data']??[]) as $o) if(($o['external_ref']??'')===$ref && !empty($o['license_id'])) return ['ok'=>true,'license_id'=>(int)$o['license_id']];
+    return ['ok'=>false,'error'=>'SkyNoc license is not assigned to this WHMCS service yet.'];
+}
+
 function skynoclicense_TerminateAccount($params)
 {
-    // License cancellation can be handled from SkyNoc admin until a dedicated
-    // cancellation/refund API is enabled.
-    return 'success';
+    $l=skynoclicense_find_license($params); if(!$l['ok']) return $l['error'];
+    $r=skynoclicense_call($params,'POST','licenses/'.$l['license_id'].'/terminate'); return $r['ok']?'success':$r['error'];
 }
 
 function skynoclicense_SuspendAccount($params)
 {
-    return 'success';
+    $l=skynoclicense_find_license($params); if(!$l['ok']) return $l['error'];
+    $r=skynoclicense_call($params,'POST','licenses/'.$l['license_id'].'/suspend'); return $r['ok']?'success':$r['error'];
 }
 
 function skynoclicense_UnsuspendAccount($params)
 {
-    return 'success';
+    $l=skynoclicense_find_license($params); if(!$l['ok']) return $l['error'];
+    $r=skynoclicense_call($params,'POST','licenses/'.$l['license_id'].'/unsuspend'); return $r['ok']?'success':$r['error'];
 }
 
 function skynoclicense_ChangePackage($params)
