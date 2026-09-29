@@ -124,6 +124,28 @@ function skynoc_migrate(PDO $db): void
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
 
+        $migrations['2026_09_29_payment_methods'] = [
+            "CREATE TABLE IF NOT EXISTS payment_methods (
+                id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                code VARCHAR(60) NOT NULL UNIQUE,
+                name VARCHAR(120) NOT NULL,
+                enabled TINYINT(1) NOT NULL DEFAULT 1,
+                min_amount DECIMAL(14,2) NOT NULL DEFAULT 1.00,
+                instructions TEXT NULL,
+                auto_verify TINYINT(1) NOT NULL DEFAULT 0,
+                sort_order INT NOT NULL DEFAULT 0,
+                created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+                INDEX idx_payment_methods_enabled_sort (enabled,sort_order)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT IGNORE INTO payment_methods(code,name,enabled,min_amount,instructions,auto_verify,sort_order) VALUES
+            ('USDT_BEP20','USDT (BEP20 / BSC)',1,15.00,'Send USDT through BSC/BEP20 and submit the transaction hash. The blockchain transfer is verified automatically.',1,1),
+            ('bKash','bKash',1,15.00,'Pay using the SkyNoc-approved bKash payment instructions and submit the payment reference.',0,2),
+            ('Binance_Crypto','Binance / Crypto',1,15.00,'Follow the payment instructions provided by SkyNoc support and submit your payment reference.',0,3),
+            ('Bank_Transfer','Bank Transfer',1,15.00,'Complete the bank transfer and submit the transaction/reference number.',0,4),
+            ('Manual','Manual Payment',0,15.00,'Contact SkyNoc support for manual payment instructions.',0,5)"
+        ];
+
         foreach ($migrations as $version => $queries) {
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
