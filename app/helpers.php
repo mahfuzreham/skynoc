@@ -74,3 +74,57 @@ function wallet_debit(int $resellerId, float $amount, string $type='purchase', ?
     $s=$db->prepare('INSERT INTO wallet_transactions(reseller_id,type,amount,reference,description,order_id,created_by) VALUES(?,?,?,?,?,?,?)');
     $s->execute([$resellerId,$type,-$amount,$reference,$description,$orderId,$createdBy]);
 }
+
+
+function reseller_level_thresholds(): array {
+    return [
+        1 => ['min' => 0, 'max' => 10, 'name' => 'Starter Reseller'],
+        2 => ['min' => 11, 'max' => 25, 'name' => 'Growing Reseller'],
+        3 => ['min' => 26, 'max' => 50, 'name' => 'Pro Reseller'],
+        4 => ['min' => 51, 'max' => 100, 'name' => 'Elite Reseller'],
+        5 => ['min' => 101, 'max' => PHP_INT_MAX, 'name' => 'Top Reseller'],
+    ];
+}
+
+function reseller_active_license_count(int $resellerId): int {
+    global $db;
+    $s = $db->prepare("SELECT COUNT(*) FROM licenses WHERE reseller_id=? AND status='active'");
+    $s->execute([$resellerId]);
+    return (int)$s->fetchColumn();
+}
+
+function reseller_calculated_level(int $activeLicenses): int {
+    foreach (reseller_level_thresholds() as $level => $range) {
+        if ($activeLicenses >= $range['min'] && $activeLicenses <= $range['max']) return $level;
+    }
+    return 1;
+}
+
+function reseller_level(int $resellerId): array {
+    global $db;
+    $s = $db->prepare('SELECT level_mode, custom_level FROM resellers WHERE id=? LIMIT 1');
+    $s->execute([$resellerId]);
+    $r = $s->fetch() ?: ['level_mode' => 'auto', 'custom_level' => null];
+    $active = reseller_active_license_count($resellerId);
+    $calculated = reseller_calculated_level($active);
+    $assigned = (($r['level_mode'] ?? 'auto') === 'custom' && (int)($r['custom_level'] ?? 0) >= 1)
+        ? (int)$r['custom_level'] : $calculated;
+    $ranges = reseller_level_thresholds();
+    $current = $ranges[$assigned] ?? $ranges[$calculated];
+    $next = $assigned < 5 ? $ranges[$assigned + 1] : null;
+    $nextLevel = $assigned < 5 ? $assigned + 1 : null;
+    $needed = $next ? max(0, $next['min'] - $active) : 0;
+    return [
+        'active' => $active,
+        'calculated_level' => $calculated,
+        'assigned_level' => $assigned,
+        'mode' => (($r['level_mode'] ?? 'auto') === 'custom') ? 'custom' : 'auto',
+        'name' => $current['name'],
+        'min' => $current['min'],
+        'max' => $current['max'],
+        'next_level' => $nextLevel,
+        'next_name' => $next['name'] ?? null,
+        'needed' => $needed,
+        'progress' => $assigned >= 5 ? 100 : min(100, max(0, (int)round(($active / max(1, $next['min'])) * 100))),
+    ];
+}
