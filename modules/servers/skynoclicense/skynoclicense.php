@@ -149,7 +149,11 @@ function skynoclicense_UnsuspendAccount($params)
 
 function skynoclicense_ChangePackage($params)
 {
-    return 'success';
+    $l=skynoclicense_find_license($params); if(!$l['ok']) return $l['error'];
+    $packageId=(int)($params['configoption1']??0);
+    if($packageId<=0) return 'SkyNoc Package ID is not configured.';
+    $r=skynoclicense_call($params,'POST','licenses/'.$l['license_id'].'/package',['package_id'=>$packageId]);
+    return $r['ok']?'success':$r['error'];
 }
 
 function skynoclicense_TestConnection($params)
