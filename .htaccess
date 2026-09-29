@@ -30,6 +30,8 @@ RewriteRule ^reseller/?$ public/reseller.php [L,QSA]
 RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
 RewriteRule ^security/?$ public/security.php [L,QSA]
 RewriteRule ^admin/reports/?$ public/reports.php [L,QSA]
+RewriteRule ^admin/coupons/?$ public/admin-coupons.php [L,QSA]
+RewriteRule ^reseller/white-label/?$ public/white-label.php [L,QSA]
 RewriteRule ^cron/?$ public/cron.php [L,QSA]
 
 # Backward-compatible legacy .php routes
