@@ -5,7 +5,7 @@ function platform_coupon(string $code, float $baseAmount): ?array {
     global $db;
     $code = strtoupper(trim($code));
     if ($code === '' || $baseAmount <= 0) return null;
-    $s=$db->prepare("SELECT * FROM coupons WHERE code=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (expires_at IS NULL OR expires_at>=NOW()) AND (max_uses IS NULL OR used_count<max_uses) LIMIT 1");
+    $s=$db->prepare("SELECT * FROM coupons WHERE code=? AND active=1 AND (starts_at IS NULL OR starts_at<=NOW()) AND (expires_at IS NULL OR expires_at>=NOW()) AND (max_uses IS NULL OR used_count<max_uses) LIMIT 1 FOR UPDATE");
     $s->execute([$code]); $c=$s->fetch();
     if (!$c) return null;
     $discount = $c['type']==='fixed' ? (float)$c['value'] : $baseAmount*((float)$c['value']/100);
