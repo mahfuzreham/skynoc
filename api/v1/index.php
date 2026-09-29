@@ -156,4 +156,11 @@ if ($method === 'POST' && preg_match('#/licenses/(\\d+)/domain$#',$path,$m)) {
     json_response(['message'=>'domain_updated','license_id'=>(int)$lic['id'],'domain'=>$domain]);
 }
 
+if ($method === 'GET' && preg_match('#/branding/?$#',$path)) {
+    if (!api_has_scope($key,'licenses:read')) json_response(['error'=>'insufficient_scope'],403);
+    $s=$db->prepare('SELECT company_name,logo_url,support_email,website_url,brand_color,custom_domain,enabled FROM white_label_settings WHERE reseller_id=? LIMIT 1');
+    $s->execute([$key['reseller_id']]); $branding=$s->fetch()?:['enabled'=>0];
+    json_response(['data'=>$branding]);
+}
+
 json_response(['error'=>'endpoint_not_found'],404);
