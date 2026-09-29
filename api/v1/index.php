@@ -68,9 +68,13 @@ if ($method === 'POST' && preg_match('#/orders/?$#',$path)) {
             if($existing){ $db->commit(); json_response(['message'=>'order_already_exists','order_id'=>(int)$existing['id'],'amount'=>(float)$existing['amount'],'status'=>$existing['status']],200); }
         }
         $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source,external_ref) VALUES(?,?,?,?,"pending","api",?)');
-        $lv=reseller_level((int)$key['reseller_id']); $price=reseller_package_price((float)$package['price'],$lv['assigned_level']); $q->execute([$key['reseller_id'],$packageId,$domain,$price,$externalRef]); $orderId=(int)$db->lastInsertId();
+        $lv=reseller_level((int)$key['reseller_id']); $basePrice=reseller_package_price((float)$package['price'],$lv['assigned_level']);
+        $coupon=platform_coupon((string)($data['coupon_code']??''),$basePrice); $couponDiscount=$coupon['discount']??0.0; $price=round(max(0,$basePrice-$couponDiscount),2);
+        $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source,external_ref,coupon_code,coupon_discount) VALUES(?,?,?,?,"pending","api",?,?,?)');
+        $q->execute([$key['reseller_id'],$packageId,$domain,$price,$externalRef,$coupon['code']??null,$couponDiscount]); $orderId=(int)$db->lastInsertId();
+        if($coupon) platform_redeem_coupon((int)$coupon['id'],(int)$key['reseller_id'],$orderId,$couponDiscount);
         wallet_debit((int)$key['reseller_id'],$price,'purchase','ORDER-'.$orderId,'API package purchase: '.$package['name'],$orderId,null);
-        $db->commit();
+        $db->commit(); platform_invoice_for_order($orderId);
         telegram_notify("🛒 <b>NEW API ORDER</b>\\nReseller: ".e($key['reseller_name'])."\\nOrder: ".$orderId."\\nPackage: ".e($package['name'])."\\nAmount: $".number_format($price,2)."\\nDomain: ".e($domain));
         json_response(['message'=>'order_created','order_id'=>$orderId,'amount'=>$price,'status'=>'pending'],201);
     } catch (Throwable $e) {
