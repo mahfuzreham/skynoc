@@ -44,7 +44,7 @@ if ($method === 'GET' && preg_match('#/packages/?$#',$path)) {
 
 if ($method === 'GET' && preg_match('#/orders/?$#',$path)) {
     if (!api_has_scope($key,'orders:read')) json_response(['error'=>'insufficient_scope'],403);
-    $s=$db->prepare('SELECT o.id,o.package_id,p.name package_name,o.license_id,o.domain,o.amount,o.status,o.source,o.created_at,o.updated_at,o.completed_at FROM orders o JOIN packages p ON p.id=o.package_id WHERE o.reseller_id=? ORDER BY o.id DESC');
+    $s=$db->prepare('SELECT o.id,o.package_id,p.name package_name,o.license_id,o.domain,o.amount,o.status,o.source,o.external_ref,o.created_at,o.updated_at,o.completed_at FROM orders o JOIN packages p ON p.id=o.package_id WHERE o.reseller_id=? ORDER BY o.id DESC');
     $s->execute([$key['reseller_id']]);
     json_response(['data'=>$s->fetchAll()]);
 }
