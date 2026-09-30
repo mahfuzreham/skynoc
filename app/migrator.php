@@ -159,7 +159,6 @@ function skynoc_migrate(PDO $db): void
         $migrations['2026_09_30_payment_method_compat'] = [
             "ALTER TABLE payment_methods ADD COLUMN min_deposit DECIMAL(14,2) NOT NULL DEFAULT 1.00",
             "ALTER TABLE payment_methods ADD COLUMN config_json JSON NULL",
-            "UPDATE payment_methods SET min_deposit=min_amount WHERE min_deposit=1.00 AND min_amount IS NOT NULL"
         ];
 
         $migrations['2026_09_29_platform_plus'] = [
