@@ -156,6 +156,12 @@ function skynoc_migrate(PDO $db): void
                 (1,0.00),(2,0.00),(3,0.00),(4,0.00),(5,0.00)"
         ];
 
+        $migrations['2026_09_30_payment_method_compat'] = [
+            "ALTER TABLE payment_methods ADD COLUMN min_deposit DECIMAL(14,2) NOT NULL DEFAULT 1.00",
+            "ALTER TABLE payment_methods ADD COLUMN config_json JSON NULL",
+            "UPDATE payment_methods SET min_deposit=min_amount WHERE min_deposit=1.00 AND min_amount IS NOT NULL"
+        ];
+
         $migrations['2026_09_29_platform_plus'] = [
             "CREATE TABLE IF NOT EXISTS user_2fa (user_id BIGINT UNSIGNED PRIMARY KEY,secret VARCHAR(64) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,recovery_codes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "CREATE TABLE IF NOT EXISTS coupons (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(60) NOT NULL UNIQUE,type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',value DECIMAL(14,2) NOT NULL,max_uses INT UNSIGNED NULL,used_count INT UNSIGNED NOT NULL DEFAULT 0,starts_at DATETIME NULL,expires_at DATETIME NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_by BIGINT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_coupons_active(active,starts_at,expires_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
