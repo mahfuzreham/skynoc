@@ -16,6 +16,11 @@ return [
         'receiving_address' => 'YOUR_BSC_USDT_RECEIVING_ADDRESS',
         'min_confirmations' => 12,
     ],
+    'cloudflare' => [
+        'enabled' => false,
+        'api_token' => 'YOUR_CLOUDFLARE_API_TOKEN',
+        'account_id' => 'YOUR_CLOUDFLARE_ACCOUNT_ID',
+    ],
     'db' => [
         'host' => '127.0.0.1',
         'port' => 3306,
