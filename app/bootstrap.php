@@ -49,6 +49,7 @@ require_once __DIR__ . '/twofa.php';
 require_once __DIR__ . '/telegram.php';
 require_once __DIR__ . '/usdt.php';
 require_once __DIR__ . '/payment.php';
+require_once __DIR__ . '/cloudflare.php';
 
 /*
  * Automatic database migrations.
