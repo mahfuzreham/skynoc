@@ -1,0 +1,31 @@
+<?php
+declare(strict_types=1);
+
+/** Automatically fulfills paid reseller orders from the available license inventory. */
+function skynoc_auto_fulfill_orders(int $limit=25): int
+{
+    global $db;
+    $done=0;
+    $q=$db->prepare("SELECT o.id,o.reseller_id,o.package_id,o.domain,p.name,p.billing_period FROM orders o JOIN packages p ON p.id=o.package_id WHERE o.status='pending' ORDER BY o.id ASC LIMIT ?");
+    $q->bindValue(1,max(1,min(100,$limit)),PDO::PARAM_INT); $q->execute(); $orders=$q->fetchAll();
+    foreach($orders as $order){
+        try{
+            $db->beginTransaction();
+            $lock=$db->prepare("SELECT id,reseller_id,package_id,domain,status FROM orders WHERE id=? FOR UPDATE"); $lock->execute([(int)$order['id']]); $o=$lock->fetch();
+            if(!$o || $o['status']!=='pending'){ $db->rollBack(); continue; }
+            $ls=$db->query("SELECT id,license_key FROM licenses WHERE status='available' AND reseller_id IS NULL ORDER BY id ASC LIMIT 1 FOR UPDATE"); $license=$ls->fetch();
+            if(!$license){ $db->rollBack(); continue; }
+            $expires=null;
+            if($order['billing_period']==='monthly') $expires=(new DateTimeImmutable('now'))->modify('+1 month')->format('Y-m-d H:i:s');
+            elseif($order['billing_period']==='annual') $expires=(new DateTimeImmutable('now'))->modify('+1 year')->format('Y-m-d H:i:s');
+            $db->prepare("UPDATE licenses SET reseller_id=?,domain=?,status='active',purchase_date=CURDATE(),expires_at=?,package_id=?,updated_at=NOW() WHERE id=? AND status='available'")->execute([(int)$order['reseller_id'],$order['domain'],$expires,(int)$order['package_id'],(int)$license['id']]);
+            if($db->lastInsertId()===''){ /* no-op: UPDATE has no insert id */ }
+            $db->prepare("UPDATE orders SET license_id=?,status='completed',completed_at=NOW(),updated_at=NOW() WHERE id=? AND status='pending'")->execute([(int)$license['id'],(int)$order['id']]);
+            $db->prepare('INSERT INTO license_history(license_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?)')->execute([(int)$license['id'],'auto_provision',null,$order['domain'],'Automatically assigned to reseller order #'.$order['id']]);
+            $db->commit();
+            notify_reseller((int)$order['reseller_id'],'order','License provisioned','Order #'.$order['id'].' for '.$order['name'].' has been completed automatically. License: '.$license['license_key'].' Domain: '.$order['domain']);
+            $done++;
+        }catch(Throwable $e){ if($db->inTransaction())$db->rollBack(); error_log('SkyNoc auto fulfillment order #'.(int)$order['id'].': '.$e->getMessage()); }
+    }
+    return $done;
+}
