@@ -13,6 +13,10 @@ RewriteEngine On
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
+# Dedicated Hostname portal subdomain.
+RewriteCond %{HTTP_HOST} ^hostname\.skynoc\.net$ [NC]
+RewriteRule ^$ public/hostname.php [L,QSA]
+
 # Telegram control webhook
 RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
 
@@ -27,6 +31,8 @@ RewriteRule ^logout/?$ public/logout.php [L,QSA]
 RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
 RewriteRule ^admin/?$ public/admin.php [L,QSA]
 RewriteRule ^reseller/?$ public/reseller.php [L,QSA]
+RewriteRule ^hostname/?$ public/hostname.php [L,QSA]
+RewriteRule ^admin/hostname/?$ public/admin-hostname.php [L,QSA]
 RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
 RewriteRule ^security/?$ public/security.php [L,QSA]
 RewriteRule ^admin/reports/?$ public/reports.php [L,QSA]
