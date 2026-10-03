@@ -65,3 +65,13 @@ if (($config['auto_migrate'] ?? true) === true) {
         exit('Database migration failed. Check the server error log.');
     }
 }
+
+// Hostname/DNS service schema is additive and safe for existing installations.
+try {
+    require_once __DIR__ . '/hostname_migrate.php';
+    skynoc_hostname_migrate($db);
+} catch (Throwable $e) {
+    http_response_code(500);
+    error_log('SkyNoc Hostname schema failed: ' . $e->getMessage());
+    exit('Hostname service database setup failed. Check the server error log.');
+}
