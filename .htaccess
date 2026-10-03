@@ -1,7 +1,6 @@
 Options -Indexes
 RewriteEngine On
 
-# Never expose application internals, configuration, database dumps, or storage files.
 <FilesMatch "^(config\.php|config\.example\.php|schema\.sql|migration_existing\.sql|\.env.*)$">
     Require all denied
 </FilesMatch>
@@ -13,17 +12,10 @@ RewriteEngine On
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
-# Dedicated Hostname portal subdomain.
 RewriteCond %{HTTP_HOST} ^hostname\.skynoc\.net$ [NC]
 RewriteRule ^$ public/hostname.php [L,QSA]
-
-# Telegram control webhook
 RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
-
-# API
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
-
-# Public application routes
 RewriteRule ^$ public/index.php [L]
 RewriteRule ^login/?$ public/login.php [L,QSA]
 RewriteRule ^reseller/register/?$ public/reseller-register.php [L,QSA]
@@ -31,6 +23,7 @@ RewriteRule ^logout/?$ public/logout.php [L,QSA]
 RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
 RewriteRule ^admin/?$ public/admin.php [L,QSA]
 RewriteRule ^reseller/?$ public/reseller.php [L,QSA]
+RewriteRule ^reseller/notifications/?$ public/reseller-notifications.php [L,QSA]
 RewriteRule ^hostname/?$ public/hostname.php [L,QSA]
 RewriteRule ^admin/hostname/?$ public/admin-hostname.php [L,QSA]
 RewriteRule ^api-docs/?$ public/api-docs.php [L,QSA]
@@ -40,17 +33,8 @@ RewriteRule ^admin/coupons/?$ public/admin-coupons.php [L,QSA]
 RewriteRule ^reseller/white-label/?$ public/white-label.php [L,QSA]
 RewriteRule ^invoice/?$ public/invoice.php [L,QSA]
 RewriteRule ^cron/?$ public/cron.php [L,QSA]
-
-# Backward-compatible legacy .php routes
 RewriteRule ^(login|logout|dashboard|admin|reseller|api-docs)\.php$ /$1 [R=301,L]
-
-# Block direct access to non-public application directories.
 RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
-
-# Reseller level dashboard
 RewriteRule ^reseller/levels/?$ public/reseller-levels.php [L,QSA]
-# Admin reseller level management
 RewriteRule ^admin/reseller-levels/?$ public/admin-reseller-levels.php [L,QSA]
-
-# Central admin settings
 RewriteRule ^admin/settings/?$ public/admin-settings.php [L,QSA]
