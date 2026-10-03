@@ -31,6 +31,8 @@ function cloudflare_request(string $method, string $path, ?array $body=null): ar
 
 function cloudflare_sync_zones(): int {
     global $db;
+    $u=current_user();
+    if (!$u || !in_array($u['role'] ?? '', ['owner','admin'], true)) throw new RuntimeException('Cloudflare zone sync is restricted to administrators.');
     $cfg=cloudflare_config();
     $page=1; $saved=0;
     do {
