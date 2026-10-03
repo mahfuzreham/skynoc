@@ -7,6 +7,9 @@ return [
     'timezone' => 'Asia/Dhaka',
     'session_name' => 'skynoc_session',
     'auto_migrate' => true,
+    'mail' => [
+        'from' => 'no-reply@skynoc.net',
+    ],
     'usdt_bep20' => [
         'enabled' => true,
         'chain_id' => 56,
