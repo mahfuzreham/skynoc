@@ -5,9 +5,8 @@ function payment_methods(): array {
     global $db;
     $rows=$db->query("SELECT code,name,enabled,min_deposit,instructions,sort_order,config_json FROM payment_methods ORDER BY sort_order,id")->fetchAll();
 
-    // Resellers need to see where to send a payment before submitting a deposit.
-    // Keep admin/payment-management labels unchanged; only enrich the reseller-facing
-    // method label with a configured public receiving address when available.
+    // Resellers need to see the public receiving address before submitting a deposit.
+    // Only public address fields are exposed; API credentials/secrets are never shown.
     $isResellerDeposit = strpos((string)($_SERVER['REQUEST_URI'] ?? ''), '/reseller/manage') !== false;
     if ($isResellerDeposit) {
         foreach ($rows as &$row) {
@@ -22,6 +21,19 @@ function payment_methods(): array {
                 if (!empty($cfg[$key]) && is_string($cfg[$key])) {
                     $address = trim($cfg[$key]);
                     break;
+                }
+            }
+
+            // Also support payment-specific nested configuration such as binance.*.
+            if ($address === '') {
+                foreach ($cfg as $nested) {
+                    if (!is_array($nested)) continue;
+                    foreach (['receiving_address','wallet_address','payment_address','deposit_address'] as $key) {
+                        if (!empty($nested[$key]) && is_string($nested[$key])) {
+                            $address = trim($nested[$key]);
+                            break 2;
+                        }
+                    }
                 }
             }
 
