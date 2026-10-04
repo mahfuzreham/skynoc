@@ -110,7 +110,11 @@ try {
             $coupon=platform_coupon((string)($_POST['coupon_code']??''),$basePrice);
             $couponDiscount=$coupon['discount']??0.0;
             $price=round(max(0,$basePrice-$couponDiscount),2);
-            if($balance < $price) throw new RuntimeException('Insufficient wallet balance. Please deposit funds first.');
+            if($balance < $price){
+      $db->rollBack();
+      if(function_exists('reseller_notify_low_balance')) reseller_notify_low_balance($rid,$balance,$price);
+      throw new RuntimeException('Insufficient wallet balance. Please deposit funds first.');
+  }
             $q=$db->prepare('INSERT INTO orders(reseller_id,package_id,domain,amount,status,source,coupon_code,coupon_discount) VALUES(?,?,?,?,"pending","portal",?,?)');
             $q->execute([$rid,$packageId,$domain,$price,$coupon['code']??null,$couponDiscount]);
             $orderId=(int)$db->lastInsertId();
@@ -119,7 +123,10 @@ try {
             $db->commit();
             platform_invoice_for_order($orderId);
             telegram_notify("🛒 <b>NEW PACKAGE ORDER</b>\\nReseller: ".e($u['name'])."\\nOrder: ".$orderId."\\nPackage: ".e($package['name'])."\\nAmount: $".number_format($price,2)."\\nDomain: ".e($domain));
-            $msg='Order submitted. Your wallet has been reserved for this order.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');
+            $orderMessage='Order #'.$orderId.' submitted successfully. Your wallet has been debited $'.number_format($price,2).'.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');
+  if(function_exists('notify_reseller')) notify_reseller($rid,'order','Order submitted',$orderMessage);
+  if(function_exists('reseller_notify_all')) reseller_notify_all($rid,'SkyNoc order submitted',$orderMessage);
+  $msg='Order submitted. Your wallet has been reserved for this order.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');
         }
 
         if ($action === 'reissue') {
