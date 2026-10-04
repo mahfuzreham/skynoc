@@ -2,6 +2,11 @@
 declare(strict_types=1);
 require __DIR__ . '/../app/bootstrap.php';
 $cfg=skynoc_telegram_settings();$token=skynoc_telegram_bot_token();$adminIds=skynoc_telegram_admin_chat_ids();
+if($_SERVER['REQUEST_METHOD']!=='POST'){
+    header('Content-Type: text/plain; charset=utf-8');
+    if($token!==''&&$adminIds){http_response_code(200);exit('SkyNoc Telegram webhook is active.');}
+    http_response_code(503);exit('SkyNoc Telegram webhook is not configured.');
+}
 if($token===''||!$adminIds){http_response_code(503);exit('Telegram bot is not configured.');}
 $raw=file_get_contents('php://input');$update=json_decode($raw?:'',true);if(!is_array($update)){http_response_code(400);exit('Invalid Telegram update.');}
 function tg_update_chat_id(array $u): string{$id=$u['callback_query']['message']['chat']['id']??$u['message']['chat']['id']??'';return (string)$id;}
