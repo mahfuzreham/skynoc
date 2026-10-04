@@ -1,50 +1,14 @@
 <?php
 require __DIR__ . '/../app/bootstrap.php';
-$u = require_role(['reseller']);
-$s = $db->prepare('SELECT * FROM resellers WHERE user_id=? LIMIT 1');
-$s->execute([$u['id']]);
-$r = $s->fetch();
-if (!$r) exit('Reseller profile not found.');
-$level = reseller_level((int)$r['id']);
-$thresholds = reseller_level_thresholds();
-$colors = [1=>'🥉',2=>'🥈',3=>'🥇',4=>'💎',5=>'👑'];
+$u=require_role(['reseller']);
+$s=$db->prepare('SELECT * FROM resellers WHERE user_id=? LIMIT 1');$s->execute([$u['id']]);$r=$s->fetch();if(!$r)exit('Reseller profile not found.');
+$level=reseller_level((int)$r['id']);$thresholds=reseller_level_thresholds();
+$base=14.50;$q=$db->query('SELECT price FROM packages WHERE active=1 ORDER BY sort_order,id LIMIT 1');if($q){$v=$q->fetchColumn();if($v!==false&&(float)$v>0)$base=(float)$v;}$retail=17.22;$rows=[];foreach($thresholds as $n=>$range){$d=reseller_level_discount($n);$p=reseller_package_price($base,$n);$rows[$n]=[$d,$p,round($retail-$p,2)];}
 ?>
-<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Reseller Level — SkyNoc</title>
-<style>
-*{box-sizing:border-box}body{margin:0;background:#f6f8fb;color:#0f172a;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}
-.nav{background:#111827;color:#fff;padding:15px 5%;display:flex;justify-content:space-between;align-items:center}.nav a{color:#fff;text-decoration:none;margin-left:14px}
-.wrap{max-width:1050px;margin:28px auto;padding:0 16px}.hero{background:#111827;color:#fff;border-radius:22px;padding:28px;margin-bottom:18px}
-.badge{display:inline-block;padding:8px 13px;border-radius:999px;background:#fff1;color:#fff;font-weight:800}.level{font-size:38px;font-weight:900;margin:12px 0 4px}.muted{opacity:.72}
-.card{background:#fff;border:1px solid #e5e7eb;border-radius:18px;padding:20px;margin-bottom:18px;box-shadow:0 6px 24px #0f172a0b}
-.progress{height:13px;background:#e9eef5;border-radius:99px;overflow:hidden}.bar{height:100%;background:#111827;border-radius:99px}
-.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(180px,1fr));gap:14px}.stat{background:#f8fafc;border-radius:14px;padding:16px}.num{font-size:25px;font-weight:850}
-.levels{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.lv{border:1px solid #e5e7eb;border-radius:15px;padding:15px;text-align:center}.active{border:2px solid #111827;background:#f8fafc}.emoji{font-size:27px}
-@media(max-width:700px){.levels{grid-template-columns:1fr 1fr}.level{font-size:30px}.nav{flex-direction:column;align-items:flex-start;gap:8px}}
+<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Reseller Levels — SkyNoc</title><style>
+*{box-sizing:border-box}body{margin:0;background:#050505;color:#f5f5f5;font-family:Inter,system-ui,-apple-system,"Segoe UI",sans-serif}.nav{height:64px;border-bottom:1px solid #202020;display:flex;align-items:center;justify-content:space-between;padding:0 5%}.brand{font-weight:900}.brand span{color:#777;font-size:10px;margin-left:5px}.links{display:flex;gap:18px;color:#999;font-size:12px;font-weight:700}.links a{color:inherit;text-decoration:none}.links a:hover{color:#fff}.wrap{width:min(1120px,92%);margin:auto;padding:46px 0}.hero{margin-bottom:28px}.eyebrow{font-size:11px;color:#777;text-transform:uppercase;letter-spacing:.16em;font-weight:900}.hero h1{font-size:clamp(30px,4vw,48px);line-height:1.05;letter-spacing:-1.8px;margin:9px 0}.hero p{color:#999;font-size:14px;margin:0;max-width:760px}.panel{background:#090909;border:1px solid #202020;border-radius:13px;overflow:hidden}.scroll{overflow-x:auto}table{width:100%;min-width:720px;border-collapse:collapse}th,td{padding:15px 16px;border-bottom:1px solid #1d1d1d}th{font-size:11px;color:#c9c9c9;text-align:left;background:#070707}td{font-size:13px}.center{text-align:center}.right{text-align:right;font-variant-numeric:tabular-nums}.level{font-weight:850}.discount,.profit{font-weight:850}.note{padding:15px 17px;border-top:1px solid #202020;color:#777;font-size:11px;display:flex;justify-content:space-between;gap:20px}.note b{color:#aaa}.footer{display:flex;justify-content:space-between;gap:20px;flex-wrap:wrap;color:#666;font-size:11px;margin-top:20px}.footer a{color:#aaa;text-decoration:none}@media(max-width:760px){.links a:nth-child(2){display:none}.wrap{padding:30px 0}.hero h1{font-size:32px}.note{display:block}.note span{display:block;margin:4px 0}}
 </style></head><body>
-<div class="nav"><b>SkyNoc Reseller</b><span><?=e($u['name'])?> · <a href="/reseller">Dashboard</a> <a href="/logout">Logout</a></span></div>
-<div class="wrap">
-<div class="hero">
-<div class="badge"><?=$colors[$level['assigned_level']]?> Level <?=$level['assigned_level']?><?= $level['mode']==='custom' ? ' · Custom' : '' ?></div>
-<div class="level"><?=e($level['name'])?></div>
-<div class="muted"><?=$level['active']?> active license<?= $level['active']===1?'':'s' ?> currently assigned</div>
-</div>
-<div class="grid">
-<div class="card stat"><div class="muted">Active Licenses</div><div class="num"><?=number_format($level['active'])?></div></div>
-<div class="card stat"><div class="muted">Current Level</div><div class="num">Level <?=$level['assigned_level']?></div></div>
-<div class="card stat"><div class="muted">Level Mode</div><div class="num"><?=e(strtoupper($level['mode']))?></div></div>
-<div class="card stat"><div class="muted">Calculated Level</div><div class="num">Level <?=$level['calculated_level']?></div></div>
-</div>
-<div class="card">
-<h2><?= $level['assigned_level']>=5 ? '👑 You reached the top reseller level' : '🎯 Your next target' ?></h2>
-<?php if($level['assigned_level']<5): ?>
-<p><b><?=number_format($level['needed'])?> more active license<?= $level['needed']===1?'':'s' ?></b> to reach Level <?=$level['next_level']?> — <?=e($level['next_name'])?>.</p>
-<div class="progress"><div class="bar" style="width:<?=$level['progress']?>%"></div></div>
-<p class="muted"><?=$level['active']?> active / <?=$thresholds[$level['next_level']]['min']?> needed for next level</p>
-<?php else: ?><p class="muted">There is no higher automatic level. Keep growing your active license portfolio.</p><?php endif; ?>
-</div>
-<div class="card"><h2>🏆 Reseller Levels</h2><div class="levels">
-<?php foreach($thresholds as $n=>$range): ?><div class="lv <?=$n===$level['assigned_level']?'active':''?>"><div class="emoji"><?=$colors[$n]?></div><b>Level <?=$n?></b><br><small><?=e($range['name'])?></small><br><small><?=number_format($range['min'])?><?= $n===5 ? '+' : '–'.number_format($range['max']) ?> active</small></div><?php endforeach; ?>
-</div></div>
-<?php if($level['mode']==='custom'): ?><div class="card"><b>Admin-assigned level</b><p class="muted">Your account currently has a custom level assigned by SkyNoc. Your automatic calculated level is Level <?=$level['calculated_level']?>.</p></div><?php endif; ?>
-</div></body></html>
+<nav class="nav"><a class="brand" href="/" style="color:#fff;text-decoration:none">SkyNoc <span>RESELLER</span></a><div class="links"><a href="/reseller">Dashboard</a><a href="/reseller/manage">My Licenses</a><a href="/logout">Logout</a></div></nav>
+<main class="wrap"><section class="hero"><div class="eyebrow">SkyNoc reseller program</div><h1>Reseller Levels &amp; Discounts</h1><p>Higher active-license levels unlock better discounts and give resellers more room for margin.</p></section>
+<section class="panel"><div class="scroll"><table><thead><tr><th>Level</th><th class="center">Active Licenses</th><th class="center">Discount</th><th class="right">Selling Price</th><th class="right">Profit/License</th></tr></thead><tbody><?php foreach($thresholds as $n=>$range):?><tr><td class="level"><?=e('Level '.$n.' – '.$range['name'])?></td><td class="center"><?=number_format($range['min'])?><?= $n===5?'+':'–'.number_format($range['max'])?></td><td class="center discount"><?=number_format($rows[$n][0],0)?>%</td><td class="right">$<?=number_format($rows[$n][1],2)?></td><td class="right profit">$<?=number_format($rows[$n][2],2)?></td></tr><?php endforeach;?></tbody></table></div><div class="note"><span>Reference package cost: <b>$<?=number_format($base,2)?></b> · Reference reseller selling price: <b>$<?=number_format($retail,2)?></b></span><span>Actual order pricing follows your active package and assigned level.</span></div></section>
+<div class="footer"><span>SkyNoc Reseller Program</span><span><a href="mailto:support@skynoc.net">support@skynoc.net</a> · <a href="/reseller">Back to Dashboard</a></span></div></main></body></html>
