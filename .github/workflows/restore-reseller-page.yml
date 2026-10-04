@@ -6,29 +6,19 @@ permissions:
   contents: write
 jobs:
   restore:
-    if: github.event.head_commit.message != 'Restore reseller page and add billing scope [skip ci]'
+    if: github.event.head_commit.message != 'Restore reseller page only [skip ci]'
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - name: Restore previous reseller page and add billing scope
+      - name: Restore previous reseller page
         shell: bash
         run: |
           set -euo pipefail
           git checkout HEAD^ -- public/reseller.php
-          python - <<'PY'
-          from pathlib import Path
-          p=Path('public/reseller.php')
-          s=p.read_text()
-          old='licenses:read,licenses:manage,reissue:create,reissue:read,packages:read,orders:create,orders:read'
-          new=old+',billing:notify'
-          if old not in s:
-              raise SystemExit('API scope pattern not found')
-          p.write_text(s.replace(old,new,1))
-          PY
           git config user.name 'github-actions[bot]'
           git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
           git add public/reseller.php
-          git commit -m 'Restore reseller page and add billing scope [skip ci]'
+          git commit -m 'Restore reseller page only [skip ci]'
           git rm .github/workflows/restore-reseller-page.yml
           git commit -m 'Remove temporary restore workflow [skip ci]'
           git push
