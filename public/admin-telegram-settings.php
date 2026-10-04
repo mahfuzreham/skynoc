@@ -10,18 +10,14 @@ try {
         verify_csrf();
         $action = (string)($_POST['action'] ?? 'save');
         $token = trim((string)($_POST['bot_token'] ?? ''));
-        if ($token === '') {
-            $token = (string)($tg['bot_token'] ?? $tg['license_bot_token'] ?? '');
-        }
+        if ($token === '') $token = (string)($tg['bot_token'] ?? $tg['license_bot_token'] ?? '');
 
         $rawIds = trim((string)($_POST['admin_chat_ids'] ?? ''));
         $ids = [];
         foreach (preg_split('/[\s,;]+/', $rawIds) ?: [] as $id) {
             $id = trim($id);
             if ($id === '') continue;
-            if (!preg_match('/^-?\d{5,20}$/', $id)) {
-                throw new RuntimeException('Invalid Telegram Chat ID: ' . $id);
-            }
+            if (!preg_match('/^-?\d{5,20}$/', $id)) throw new RuntimeException('Invalid Telegram Chat ID: ' . $id);
             $ids[$id] = $id;
         }
         $adminIds = implode("\n", array_values($ids));
@@ -43,23 +39,21 @@ try {
         $tg = skynoc_telegram_settings();
 
         if ($action === 'test') {
-            $sent = skynoc_telegram_send_admins("🟢 <b>SkyNoc Telegram Test</b>\n\nUnified bot is working.\n🤖 One bot · 👥 Multiple admins · 💬 Client support");
-            $msg = $sent > 0 ? 'Test notification sent to ' . $sent . ' admin chat(s).' : 'Telegram test could not be delivered.';
+            $test = skynoc_telegram_test_admins();
+            if (($test['ok'] ?? false) === true) {
+                $bot = trim((string)($test['bot_name'] ?? ''));
+                $msg = 'Telegram test delivered to ' . (int)$test['sent'] . ' admin chat(s).' . ($bot !== '' ? ' Bot: @' . $bot : '');
+            } else {
+                $details = trim((string)($test['error'] ?? 'Unknown Telegram API error.'));
+                $msg = 'Telegram test: ' . (int)($test['sent'] ?? 0) . '/' . (int)($test['total'] ?? count($ids)) . ' delivered.';
+                if ($details !== '') $error = $details;
+            }
         } elseif ($action === 'webhook') {
             $base = rtrim((string)($GLOBALS['config']['base_url'] ?? 'https://skynoc.net'), '/');
             $webhook = $base . '/telegram/control';
-            $ch = curl_init('https://api.telegram.org/bot' . rawurlencode($token) . '/setWebhook');
-            curl_setopt_array($ch, [
-                CURLOPT_POST => true,
-                CURLOPT_POSTFIELDS => ['url' => $webhook],
-                CURLOPT_RETURNTRANSFER => true,
-                CURLOPT_TIMEOUT => 15,
-            ]);
-            $result = curl_exec($ch);
-            curl_close($ch);
-            $json = is_string($result) ? json_decode($result, true) : null;
-            if (!is_array($json) || !($json['ok'] ?? false)) throw new RuntimeException('Telegram webhook setup failed.');
-            $msg = 'Webhook connected successfully.';
+            $json = skynoc_telegram_api($token, 'setWebhook', ['url' => $webhook, 'allowed_updates' => json_encode(['message','callback_query'])]);
+            if (!($json['ok'] ?? false)) throw new RuntimeException('Telegram webhook setup failed: ' . (string)($json['description'] ?? 'Unknown Telegram API error.'));
+            $msg = 'Webhook connected successfully: ' . $webhook;
         } else {
             $msg = 'Telegram settings saved successfully.';
         }
@@ -84,9 +78,7 @@ $adminCount = count(skynoc_telegram_admin_chat_ids());
 <title>Telegram & Support — SkyNoc</title>
 <link rel="stylesheet" href="/admin-page-ui.css">
 <style>
-:root{--blue:#465fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc}
-body{background:var(--soft)}.page{max-width:1180px;margin:auto}.hero{background:linear-gradient(135deg,#0f172a,#172554 55%,#2563eb);color:#fff;border-radius:24px;padding:30px;margin-bottom:18px;box-shadow:0 18px 45px rgba(16,24,40,.16)}.hero-top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.badge{display:inline-block;padding:7px 11px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);border-radius:999px;font-size:10px;font-weight:900}.hero h1{font-size:31px;margin:14px 0 6px;letter-spacing:-.04em}.hero p{max-width:760px;margin:0;color:#dbe5ff;font-size:13px;line-height:1.7}.status{min-width:150px;padding:15px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);text-align:center}.status strong{display:block;font-size:12px}.status span{font-size:10px;color:#cbd5e1}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.nav a{padding:9px 12px;border-radius:10px;color:#fff!important;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:11px;font-weight:800;text-decoration:none}.layout{display:grid;grid-template-columns:1.25fr .75fr;gap:16px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 25px rgba(16,24,40,.04)}.card h2{margin:0 0 5px;font-size:17px}.sub{margin:0 0 18px;color:var(--muted);font-size:11px;line-height:1.6}.field{margin-bottom:16px}.field label{display:block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#475467;margin-bottom:7px}.field input,.field textarea{width:100%;box-sizing:border-box}.field textarea{min-height:110px;resize:vertical}.hint{margin-top:6px;color:#98a2b3;font-size:10px;line-height:1.55}.check{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.check input{margin-top:2px}.check b{display:block;font-size:12px}.check span{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.5}.actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.btn2{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-weight:800;font-size:11px;cursor:pointer}.btn2.primary{background:var(--blue);border-color:var(--blue);color:#fff}.alert{padding:13px 15px;border-radius:12px;margin-bottom:16px;font-size:11px}.ok{background:#ecfdf3;border:1px solid #abefc6;color:#067647}.err{background:#fef3f2;border:1px solid #fecdca;color:#b42318}.warn{margin-top:14px;background:#fffaeb;border:1px solid #fedf89;color:#92400e;line-height:1.6}.info{display:grid;gap:10px}.info-row{padding:13px;border:1px solid var(--line);border-radius:13px}.info-row strong{display:block;font-size:11px}.info-row span{display:block;color:var(--muted);font-size:10px;line-height:1.55;margin-top:4px}.code{display:block;margin-top:7px;padding:9px;border-radius:9px;background:#101828;color:#d1fae5;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}.help{margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}.help h3{font-size:12px;margin:0 0 7px}.help ol{margin:0;padding-left:18px;color:var(--muted);font-size:10px;line-height:1.8}
-@media(max-width:850px){.layout{grid-template-columns:1fr}.hero-top{flex-direction:column}.status{width:100%;box-sizing:border-box}.page{padding:0 4px}}@media(max-width:600px){.hero{padding:22px 17px;border-radius:18px}.hero h1{font-size:26px}.card{padding:17px}.actions>*{width:100%}}
+:root{--blue:#465fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--soft:#f8fafc}body{background:var(--soft)}.page{max-width:1180px;margin:auto}.hero{background:linear-gradient(135deg,#0f172a,#172554 55%,#2563eb);color:#fff;border-radius:24px;padding:30px;margin-bottom:18px;box-shadow:0 18px 45px rgba(16,24,40,.16)}.hero-top{display:flex;justify-content:space-between;gap:20px;align-items:flex-start}.badge{display:inline-block;padding:7px 11px;border:1px solid rgba(255,255,255,.2);background:rgba(255,255,255,.08);border-radius:999px;font-size:10px;font-weight:900}.hero h1{font-size:31px;margin:14px 0 6px;letter-spacing:-.04em}.hero p{max-width:760px;margin:0;color:#dbe5ff;font-size:13px;line-height:1.7}.status{min-width:150px;padding:15px;border-radius:16px;background:rgba(255,255,255,.1);border:1px solid rgba(255,255,255,.16);text-align:center}.status strong{display:block;font-size:12px}.status span{font-size:10px;color:#cbd5e1}.nav{display:flex;gap:8px;flex-wrap:wrap;margin-top:20px}.nav a{padding:9px 12px;border-radius:10px;color:#fff!important;background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);font-size:11px;font-weight:800;text-decoration:none}.layout{display:grid;grid-template-columns:1.25fr .75fr;gap:16px}.card{background:#fff;border:1px solid var(--line);border-radius:18px;padding:22px;box-shadow:0 8px 25px rgba(16,24,40,.04)}.card h2{margin:0 0 5px;font-size:17px}.sub{margin:0 0 18px;color:var(--muted);font-size:11px;line-height:1.6}.field{margin-bottom:16px}.field label{display:block;font-size:10px;font-weight:900;text-transform:uppercase;letter-spacing:.06em;color:#475467;margin-bottom:7px}.field input,.field textarea{width:100%;box-sizing:border-box}.field textarea{min-height:110px;resize:vertical}.hint{margin-top:6px;color:#98a2b3;font-size:10px;line-height:1.55}.check{display:flex;gap:10px;align-items:flex-start;padding:14px;border:1px solid var(--line);border-radius:13px;background:var(--soft)}.check input{margin-top:2px}.check b{display:block;font-size:12px}.check span{display:block;margin-top:3px;color:var(--muted);font-size:10px;line-height:1.5}.actions{display:flex;gap:9px;justify-content:flex-end;flex-wrap:wrap;margin-top:18px}.btn2{border:1px solid var(--line);background:#fff;border-radius:10px;padding:10px 14px;font-weight:800;font-size:11px;cursor:pointer}.btn2.primary{background:var(--blue);border-color:var(--blue);color:#fff}.alert{padding:13px 15px;border-radius:12px;margin-bottom:16px;font-size:11px}.ok{background:#ecfdf3;border:1px solid #abefc6;color:#067647}.err{background:#fef3f2;border:1px solid #fecdca;color:#b42318}.warn{margin-top:14px;background:#fffaeb;border:1px solid #fedf89;color:#92400e;line-height:1.6}.info{display:grid;gap:10px}.info-row{padding:13px;border:1px solid var(--line);border-radius:13px}.info-row strong{display:block;font-size:11px}.info-row span{display:block;color:var(--muted);font-size:10px;line-height:1.55;margin-top:4px}.code{display:block;margin-top:7px;padding:9px;border-radius:9px;background:#101828;color:#d1fae5;font:10px ui-monospace,SFMono-Regular,Consolas,monospace;word-break:break-all}.help{margin-top:16px;padding-top:15px;border-top:1px solid var(--line)}.help h3{font-size:12px;margin:0 0 7px}.help ol{margin:0;padding-left:18px;color:var(--muted);font-size:10px;line-height:1.8}@media(max-width:850px){.layout{grid-template-columns:1fr}.hero-top{flex-direction:column}.status{width:100%;box-sizing:border-box}.page{padding:0 4px}}@media(max-width:600px){.hero{padding:22px 17px;border-radius:18px}.hero h1{font-size:26px}.card{padding:17px}.actions>*{width:100%}}
 </style>
 </head>
 <body>
