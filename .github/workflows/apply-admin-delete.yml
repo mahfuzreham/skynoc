@@ -1,0 +1,27 @@
+name: Apply admin delete controls
+
+on:
+  push:
+    branches: [main]
+
+permissions:
+  contents: write
+
+jobs:
+  apply:
+    if: github.actor != 'github-actions[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Apply patch
+        run: |
+          python3 tools/apply_admin_delete.py
+          php -l public/admin.php
+          rm -f tools/apply_admin_delete.py .github/workflows/apply-admin-delete.yml
+      - name: Commit changes
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add public/admin.php tools/apply_admin_delete.py .github/workflows/apply-admin-delete.yml
+          git diff --cached --quiet || git commit -m "Add admin package and reseller deletion controls"
+          git push
