@@ -32,6 +32,11 @@ Never store upstream provider passwords. Provider records contain only identific
 
 Legacy `.php` routes redirect to clean URLs.
 
+## Order Automation
+Reseller orders are wallet-funded and protected by atomic wallet debit logic. Automatic fulfillment assigns an available license from the SkyNoc license inventory, assigns the reseller domain, sets the billing expiry for monthly/annual packages, creates the invoice and sends the reseller notification.
+
+The project does **not** invent or assume an upstream provider API. Automatic upstream license purchasing requires the actual provider's API documentation, endpoint, authentication method and request/response format. Until those are supplied, admin/provider inventory remains the safe source for fulfillment.
+
 ## Hostname / Cloudflare Service
 The separate Hostname product is designed for multiple domains/zones managed from one Cloudflare account.
 
@@ -43,6 +48,7 @@ Default product:
 - Customer/reseller does not receive the Cloudflare API token.
 - Orders are submitted with a payment reference and remain `pending_review` until admin approval.
 - On approval, SkyNoc creates the DNS record automatically through Cloudflare API.
+- Active hostname renewals are charged from the reseller wallet by cron. If the wallet is insufficient, the hostname is suspended and its Cloudflare record is removed when possible.
 
 ### Cloudflare setup
 Keep the Cloudflare token only in the server-side `config/config.php` or ignored `config/config.local.php`:
@@ -62,7 +68,7 @@ After deployment, open `/admin/hostname` and use **Sync Cloudflare Zones**. Admi
 For the subdomain, create `hostname.skynoc.net` in DNS and point it to the same SkyNoc/cPanel document root. The included `.htaccess` routes that host to the Hostname portal.
 
 ## Admin / Staff
-The admin panel now supports:
+The admin panel supports:
 - Provider records
 - Reseller creation
 - Staff creation and role/permission overrides
@@ -76,6 +82,8 @@ The admin panel now supports:
 ## Reseller
 The reseller portal supports:
 - Own-license isolation
+- Package ordering with level discounts and coupons
+- Wallet balance and transaction history
 - Reissue requests/history
 - API key generation/revocation
 - Notifications
@@ -83,32 +91,42 @@ The reseller portal supports:
 - Hostname/DNS ordering at `hostname.skynoc.net`
 
 ## API
-Bearer API keys support:
-- `GET /api/v1/licenses`
-- `GET /api/v1/licenses/{id}`
-- `GET /api/v1/reissues`
-- `POST /api/v1/licenses/{id}/reissue`
+Bearer API keys support license, reissue, package and order workflows according to the assigned scopes. Rate limit: 60 requests per minute per API key.
 
-Default scopes:
-- `licenses:read`
-- `reissue:create`
-- `reissue:read`
-
-Rate limit: 60 requests per minute per API key.
-
-## Automatic Expiry
-Run this script from a cron job, for example every 10 minutes:
+## Cron
+Run the SkyNoc cron every 5–10 minutes from cPanel Cron Jobs. CLI execution is preferred:
 
 ```bash
-/opt/alt/php83/usr/bin/php /home/skynoc/public_html/bin/expire_licenses.php
+/opt/alt/php83/usr/bin/php /home/skynoc/public_html/public/cron.php
 ```
 
-Adjust the PHP binary and project path for the server.
+The cron handles automatic reseller order fulfillment from available license inventory, license expiry sweeps, expiry reminders and hostname wallet renewals.
+
+If HTTP cron is required, use `/cron?key=YOUR_CRON_KEY` and keep the key private. Never post the key publicly.
+
+## CI / Testing
+GitHub Actions runs PHP 8.3 syntax checks on pushes and pull requests to `main`.
+
+Before production use, test on the live cPanel server:
+1. Login/logout and role restrictions.
+2. Reseller registration and activation deposit.
+3. Deposit approval and wallet credit.
+4. Package order, level discount, coupon and atomic wallet debit.
+5. Automatic inventory fulfillment and invoice creation.
+6. WHMCS module Create/Suspend/Unsuspend/ChangePackage/Terminate.
+7. Reissue workflow and Telegram notifications.
+8. Cloudflare zone sync, hostname activation and wallet renewal.
+9. API scopes, rate limiting and reseller isolation.
+10. Admin/staff permission boundaries.
 
 ## Security
 - Passwords use `password_hash()`.
 - API keys are stored as SHA-256 hashes and shown in plaintext only at creation.
 - CSRF is required for web POST actions.
 - Reseller queries are scoped by reseller ID.
+- Wallet debits use an atomic balance condition to prevent overspending.
+- Duplicate deposit transaction hashes are blocked at the database level.
 - Upstream provider credentials are never exposed to resellers.
 - Cloudflare API credentials are server-side only and are never rendered in reseller/customer pages.
+- Sensitive application/config/database paths are blocked by `.htaccess`.
+- Security headers and secure session cookie settings are enabled.
