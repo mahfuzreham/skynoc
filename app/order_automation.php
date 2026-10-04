@@ -22,7 +22,7 @@ function skynoc_auto_fulfill_orders(int $limit=25): int
             $up->execute([(int)$order['reseller_id'],$order['domain'],$expires,(int)$order['package_id'],(int)$license['id']]);
             if($up->rowCount()!==1) throw new RuntimeException('License became unavailable during fulfillment.');
             $doneOrder=$db->prepare("UPDATE orders SET license_id=?,status='completed',completed_at=NOW(),updated_at=NOW() WHERE id=? AND status='pending'");
-            $doneOrder->execute([(int)$license['id'],(int)$order['id']]);
+            $doneOrder->execute([(int)$license['id'],(int)$order['id']);
             if($doneOrder->rowCount()!==1) throw new RuntimeException('Order status changed during fulfillment.');
             $db->prepare('INSERT INTO license_history(license_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?)')->execute([(int)$license['id'],'auto_provision',null,$order['domain'],'Automatically assigned to reseller order #'.$order['id']]);
             $db->commit();
@@ -30,6 +30,9 @@ function skynoc_auto_fulfill_orders(int $limit=25): int
             notify_reseller((int)$order['reseller_id'],'order','License provisioned','Order #'.$order['id'].' for '.$order['name'].' has been completed automatically. License: '.$license['license_key'].' Domain: '.$order['domain']);
             $done++;
         }catch(Throwable $e){ if($db->inTransaction())$db->rollBack(); error_log('SkyNoc auto fulfillment order #'.(int)$order['id'].': '.$e->getMessage()); }
+    }
+    if (function_exists('skynoc_hostname_renewals')) {
+        try { skynoc_hostname_renewals(50); } catch (Throwable $e) { error_log('SkyNoc hostname renewal sweep: '.$e->getMessage()); }
     }
     return $done;
 }
