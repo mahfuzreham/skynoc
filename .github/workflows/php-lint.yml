@@ -1,0 +1,29 @@
+name: PHP Syntax Check
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+    branches: [main]
+
+jobs:
+  php-lint:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup PHP
+        uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.3'
+          extensions: mbstring, pdo_mysql, curl, json
+      - name: Lint PHP files
+        shell: bash
+        run: |
+          set -euo pipefail
+          failed=0
+          while IFS= read -r -d '' file; do
+            echo "Checking $file"
+            if ! php -l "$file"; then failed=1; fi
+          done < <(find . -type f -name '*.php' -not -path './.git/*' -print0)
+          exit "$failed"
