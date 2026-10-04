@@ -26,7 +26,9 @@ function platform_invoice_for_order(int $orderId): ?int {
     $existing=$s->fetchColumn(); if($existing) return (int)$existing;
     $s=$db->prepare("SELECT o.*,p.name package_name,r.name reseller_name FROM orders o JOIN packages p ON p.id=o.package_id JOIN resellers r ON r.id=o.reseller_id WHERE o.id=? LIMIT 1");
     $s->execute([$orderId]); $o=$s->fetch(); if(!$o) return null;
-    $number='SN-'.date('Ym').'-'.str_pad((string)$orderId,7,'0',STR_PAD_LEFT);
+    $prefix='SN-';
+    try { $cfg=$db->query('SELECT invoice_prefix FROM invoice_settings WHERE id=1 LIMIT 1')->fetchColumn(); if(is_string($cfg) && $cfg!=='') $prefix=$cfg; } catch(Throwable $e) { }
+    $number=$prefix.date('Ym').'-'.str_pad((string)$orderId,7,'0',STR_PAD_LEFT);
     $db->beginTransaction();
     try {
         $subtotal=(float)$o['amount']+(float)($o['coupon_discount']??0);
@@ -70,4 +72,9 @@ function platform_expiry_reminders(): int {
     } return $count;
 }
 
-function platform_invoice_number(int $id): string { return 'SN-'.date('Ym').'-'.str_pad((string)$id,7,'0',STR_PAD_LEFT); }
+function platform_invoice_number(int $id): string {
+    global $db;
+    $prefix='SN-';
+    try { $cfg=$db->query('SELECT invoice_prefix FROM invoice_settings WHERE id=1 LIMIT 1')->fetchColumn(); if(is_string($cfg) && $cfg!=='') $prefix=$cfg; } catch(Throwable $e) { }
+    return $prefix.date('Ym').'-'.str_pad((string)$id,7,'0',STR_PAD_LEFT);
+}
