@@ -1,0 +1,46 @@
+name: Temporary order notification fix
+on:
+  push:
+    branches: [main]
+permissions:
+  contents: write
+jobs:
+  fix:
+    if: github.event.head_commit.message != 'Apply order notification fixes [skip ci]'
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Patch reseller order notifications
+        shell: python
+        run: |
+          from pathlib import Path
+          p=Path('public/reseller.php')
+          s=p.read_text()
+          old="""            if($balance < $price) throw new RuntimeException('Insufficient wallet balance. Please deposit funds first.');"""
+          new="""            if($balance < $price){
+                $db->rollBack();
+                if(function_exists('reseller_notify_low_balance')) reseller_notify_low_balance($rid,$balance,$price);
+                throw new RuntimeException('Insufficient wallet balance. Please deposit funds first.');
+            }"""
+          if old not in s:
+              raise SystemExit('insufficient-balance pattern not found')
+          s=s.replace(old,new,1)
+          old="""            $msg='Order submitted. Your wallet has been reserved for this order.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');"""
+          new="""            $orderMessage='Order #'.$orderId.' submitted successfully. Your wallet has been debited $'.number_format($price,2).'.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');
+            if(function_exists('notify_reseller')) notify_reseller($rid,'order','Order submitted',$orderMessage);
+            if(function_exists('reseller_notify_all')) reseller_notify_all($rid,'SkyNoc order submitted',$orderMessage);
+            $msg='Order submitted. Your wallet has been reserved for this order.'.($coupon ? ' Coupon '.$coupon['code'].' applied.' : '');"""
+          if old not in s:
+              raise SystemExit('success-message pattern not found')
+          s=s.replace(old,new,1)
+          p.write_text(s)
+      - name: Commit and remove temporary workflow
+        shell: bash
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add public/reseller.php
+          git commit -m 'Apply order notification fixes [skip ci]'
+          git rm .github/workflows/fix-order-notifications.yml
+          git commit -m 'Remove temporary order notification workflow [skip ci]'
+          git push
