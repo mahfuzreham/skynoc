@@ -7,7 +7,7 @@ Pure PHP 8.3+ license/reseller management platform for cPanel.
 - MySQL/MariaDB
 - PDO MySQL
 - Apache with mod_rewrite
-- cURL extension for Telegram and Cloudflare API requests
+- cURL extension for Telegram, Cloudflare and Binance API requests
 
 ## Install
 1. Create a MySQL database/user in cPanel.
@@ -25,12 +25,32 @@ Never store upstream provider passwords. Provider records contain only identific
 - `https://SkyNoc.Net/login` — Login
 - `https://SkyNoc.Net/reseller` — Reseller portal
 - `https://SkyNoc.Net/admin` — Admin panel
+- `https://SkyNoc.Net/admin/settings` — Platform settings
+- `https://SkyNoc.Net/admin/settings/binance` — Binance API settings
 - `https://SkyNoc.Net/api/v1/` — Reseller API
 - `https://SkyNoc.Net/api-docs` — API documentation
 - `https://hostname.skynoc.net/` — Hostname/DNS ordering portal
 - `https://SkyNoc.Net/admin/hostname` — Hostname/Cloudflare admin
 
 Legacy `.php` routes redirect to clean URLs.
+
+## Binance USDT BEP20 Verification
+SkyNoc can use a Binance Exchange API key as an additional read-only verification source for USDT deposits on BSC/BEP20.
+
+Admin setup:
+1. Open `/admin/settings/binance`.
+2. Create a Binance API key with read-only permissions required to read deposit history. Do **not** enable withdrawals or trading.
+3. Enter the API key and secret in the SkyNoc admin page and enable Binance verification.
+4. Use **Test Binance API** before enabling it for production.
+
+The integration uses signed Binance API requests server-side and checks the USDT/BSC deposit history. A supplied TXID can be matched against Binance's credited deposit history. The existing direct BSC RPC verifier remains as a fallback.
+
+The optional recent-payment scanner can find a unique recent Binance USDT/BSC deposit matching the requested amount. SkyNoc must not automatically credit an ambiguous payment when multiple users could have made the same-sized deposit.
+
+### Important address limitation
+A normal Binance Exchange API integration does **not** provide a generic unlimited unique BEP20 address generator per SkyNoc reseller. Therefore the current integration does not falsely assign the same Binance deposit address as if it were unique to each reseller.
+
+If SkyNoc requires one unique on-chain address per reseller, use an appropriate wallet/address-derivation system or an eligible Binance business deposit-address product. The address must be mapped to the reseller before automatic address-specific crediting is enabled.
 
 ## Order Automation
 Reseller orders are wallet-funded and protected by atomic wallet debit logic. Automatic fulfillment assigns an available license from the SkyNoc license inventory, assigns the reseller domain, sets the billing expiry for monthly/annual packages, creates the invoice and sends the reseller notification.
@@ -78,6 +98,7 @@ The admin panel supports:
 - Support ticket status
 - Telegram settings
 - Hostname orders and Cloudflare domain availability
+- Binance BEP20 verification settings
 
 ## Reseller
 The reseller portal supports:
@@ -111,13 +132,14 @@ Before production use, test on the live cPanel server:
 1. Login/logout and role restrictions.
 2. Reseller registration and activation deposit.
 3. Deposit approval and wallet credit.
-4. Package order, level discount, coupon and atomic wallet debit.
-5. Automatic inventory fulfillment and invoice creation.
-6. WHMCS module Create/Suspend/Unsuspend/ChangePackage/Terminate.
-7. Reissue workflow and Telegram notifications.
-8. Cloudflare zone sync, hostname activation and wallet renewal.
-9. API scopes, rate limiting and reseller isolation.
-10. Admin/staff permission boundaries.
+4. Binance API connection test and BEP20 TXID verification.
+5. Package order, level discount, coupon and atomic wallet debit.
+6. Automatic inventory fulfillment and invoice creation.
+7. WHMCS module Create/Suspend/Unsuspend/ChangePackage/Terminate.
+8. Reissue workflow and Telegram notifications.
+9. Cloudflare zone sync, hostname activation and wallet renewal.
+10. API scopes, rate limiting and reseller isolation.
+11. Admin/staff permission boundaries.
 
 ## Security
 - Passwords use `password_hash()`.
@@ -126,6 +148,7 @@ Before production use, test on the live cPanel server:
 - Reseller queries are scoped by reseller ID.
 - Wallet debits use an atomic balance condition to prevent overspending.
 - Duplicate deposit transaction hashes are blocked at the database level.
+- Binance API credentials are used server-side and should be created without withdrawal/trading permissions.
 - Upstream provider credentials are never exposed to resellers.
 - Cloudflare API credentials are server-side only and are never rendered in reseller/customer pages.
 - Sensitive application/config/database paths are blocked by `.htaccess`.
