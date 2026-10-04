@@ -2,7 +2,7 @@
 require __DIR__ . '/../app/bootstrap.php';
 
 $u = require_role(['reseller']);
-$s = $db->prepare('SELECT id FROM resellers WHERE user_id=? LIMIT 1');
+$s = $db->prepare('SELECT id,status FROM resellers WHERE user_id=? LIMIT 1');
 $s->execute([$u['id']]);
 $r = $s->fetch();
 if (!$r) exit('Reseller profile not found.');
