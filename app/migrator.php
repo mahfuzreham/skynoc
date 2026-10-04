@@ -8,17 +8,26 @@ declare(strict_types=1);
 function skynoc_migrate(PDO $db): void
 {
     $lock = $db->query("SELECT GET_LOCK('skynoc_schema_migration', 15)")->fetchColumn();
-    if ((int)$lock !== 1) throw new RuntimeException('Could not acquire database migration lock.');
+    if ((int)$lock !== 1) {
+        throw new RuntimeException('Could not acquire database migration lock.');
+    }
 
     try {
         $db->exec("CREATE TABLE IF NOT EXISTS schema_migrations (version VARCHAR(100) PRIMARY KEY, applied_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
         $hasUsers = (bool)$db->query("SELECT COUNT(*) FROM information_schema.tables WHERE table_schema=DATABASE() AND table_name='users'")->fetchColumn();
         if (!$hasUsers) {
             $schemaFile = __DIR__ . '/../database/schema.sql';
-            if (!is_file($schemaFile) || !is_readable($schemaFile)) throw new RuntimeException('Core database schema is missing.');
+            if (!is_file($schemaFile) || !is_readable($schemaFile)) {
+                throw new RuntimeException('Core database schema is missing.');
+            }
             $sql = file_get_contents($schemaFile);
-            if ($sql === false) throw new RuntimeException('Could not read core database schema.');
-            foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\R|$)/', $sql))) as $statement) $db->exec($statement);
+            if ($sql === false) {
+                throw new RuntimeException('Could not read core database schema.');
+            }
+            foreach (array_filter(array_map('trim', preg_split('/;\s*(?:\R|$)/', $sql))) as $statement) {
+                $db->exec($statement);
+            }
             $db->prepare('INSERT IGNORE INTO schema_migrations(version) VALUES(?)')->execute(['2026_09_28_core_schema']);
         } else {
             $db->prepare('INSERT IGNORE INTO schema_migrations(version) VALUES(?)')->execute(['2026_09_28_core_schema']);
@@ -39,14 +48,62 @@ function skynoc_migrate(PDO $db): void
             "CREATE TABLE IF NOT EXISTS packages (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,name VARCHAR(120) NOT NULL,slug VARCHAR(120) NOT NULL UNIQUE,description TEXT NULL,price DECIMAL(14,2) NOT NULL,client_limit INT UNSIGNED NULL,billing_period VARCHAR(30) NOT NULL DEFAULT 'monthly',active TINYINT(1) NOT NULL DEFAULT 1,sort_order INT NOT NULL DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_packages_active_sort (active,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
             "CREATE TABLE IF NOT EXISTS orders (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,package_id BIGINT UNSIGNED NOT NULL,license_id BIGINT UNSIGNED NULL,domain VARCHAR(255) NULL,amount DECIMAL(14,2) NOT NULL,status ENUM('pending','processing','completed','rejected','refunded') NOT NULL DEFAULT 'pending',source ENUM('portal','api','whmcs_module','admin') NOT NULL DEFAULT 'portal',notes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,completed_at DATETIME NULL,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE RESTRICT,FOREIGN KEY(license_id) REFERENCES licenses(id) ON DELETE SET NULL,INDEX idx_orders_reseller (reseller_id,created_at),INDEX idx_orders_status (status)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
-        $migrations['2026_09_28_order_idempotency'] = ["ALTER TABLE orders ADD COLUMN external_ref VARCHAR(190) NULL","ALTER TABLE orders ADD UNIQUE KEY uq_orders_reseller_external (reseller_id,external_ref)"];
-        $migrations['2026_09_28_usdt_bep20_deposits'] = ["ALTER TABLE deposit_requests ADD COLUMN network VARCHAR(30) NULL","ALTER TABLE deposit_requests ADD COLUMN tx_hash VARCHAR(66) NULL","ALTER TABLE deposit_requests ADD COLUMN block_number BIGINT UNSIGNED NULL","ALTER TABLE deposit_requests ADD COLUMN from_address CHAR(42) NULL","ALTER TABLE deposit_requests ADD COLUMN to_address CHAR(42) NULL","ALTER TABLE deposit_requests ADD COLUMN token_contract CHAR(42) NULL","ALTER TABLE deposit_requests ADD COLUMN token_amount DECIMAL(36,18) NULL","ALTER TABLE deposit_requests ADD COLUMN verified_at DATETIME NULL","ALTER TABLE deposit_requests ADD UNIQUE KEY uq_deposit_tx_hash (tx_hash)"];
-        $migrations['2026_09_28_telegram_separate_bots'] = ["ALTER TABLE telegram_settings ADD COLUMN license_bot_token VARCHAR(255) NULL","ALTER TABLE telegram_settings ADD COLUMN license_admin_chat_id VARCHAR(64) NULL","ALTER TABLE telegram_settings ADD COLUMN deposit_bot_token VARCHAR(255) NULL","ALTER TABLE telegram_settings ADD COLUMN deposit_admin_chat_id VARCHAR(64) NULL","UPDATE telegram_settings SET license_bot_token=bot_token WHERE id=1 AND (license_bot_token IS NULL OR license_bot_token='')","UPDATE telegram_settings SET license_admin_chat_id=admin_chat_id WHERE id=1 AND (license_admin_chat_id IS NULL OR license_admin_chat_id='')"];
-        $migrations['2026_09_29_reseller_levels'] = ["ALTER TABLE resellers ADD COLUMN level_mode ENUM('auto','custom') NOT NULL DEFAULT 'auto'","ALTER TABLE resellers ADD COLUMN custom_level TINYINT UNSIGNED NULL","ALTER TABLE resellers ADD COLUMN level_updated_at DATETIME NULL","CREATE TABLE IF NOT EXISTS reseller_level_history (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,old_level TINYINT UNSIGNED NULL,new_level TINYINT UNSIGNED NOT NULL,mode ENUM('auto','custom') NOT NULL DEFAULT 'auto',reason VARCHAR(255) NULL,changed_by BIGINT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(changed_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_level_history_reseller (reseller_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"];
-        $migrations['2026_09_29_payment_methods'] = ["CREATE TABLE IF NOT EXISTS payment_methods (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(60) NOT NULL UNIQUE,name VARCHAR(120) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 1,min_amount DECIMAL(14,2) NOT NULL DEFAULT 1.00,instructions TEXT NULL,auto_verify TINYINT(1) NOT NULL DEFAULT 0,sort_order INT NOT NULL DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_payment_methods_enabled_sort (enabled,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","INSERT IGNORE INTO payment_methods(code,name,enabled,min_amount,instructions,auto_verify,sort_order) VALUES ('USDT_BEP20','USDT (BEP20 / BSC)',1,15.00,'Send USDT through BSC/BEP20 and submit the transaction hash. The blockchain transfer is verified automatically.',1,1),('bKash','bKash',1,15.00,'Pay using the SkyNoc-approved bKash payment instructions and submit the payment reference.',0,2),('Binance_Crypto','Binance / Crypto',1,15.00,'Follow the payment instructions provided by SkyNoc support and submit your payment reference.',0,3),('Bank_Transfer','Bank Transfer',1,15.00,'Complete the bank transfer and submit the transaction/reference number.',0,4),('Manual','Manual Payment',0,15.00,'Contact SkyNoc support for manual payment instructions.',0,5)"];
-        $migrations['2026_09_29_level_discounts'] = ["CREATE TABLE IF NOT EXISTS reseller_level_discounts (level TINYINT UNSIGNED PRIMARY KEY,discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","INSERT IGNORE INTO reseller_level_discounts(level,discount_percent) VALUES (1,0.00),(2,0.00),(3,0.00),(4,0.00),(5,0.00)"];
-        $migrations['2026_09_30_payment_method_compat'] = ["ALTER TABLE payment_methods ADD COLUMN min_deposit DECIMAL(14,2) NOT NULL DEFAULT 1.00","ALTER TABLE payment_methods ADD COLUMN config_json JSON NULL"];
-        $migrations['2026_09_29_platform_plus'] = ["CREATE TABLE IF NOT EXISTS user_2fa (user_id BIGINT UNSIGNED PRIMARY KEY,secret VARCHAR(64) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,recovery_codes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS coupons (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(60) NOT NULL UNIQUE,type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',value DECIMAL(14,2) NOT NULL,max_uses INT UNSIGNED NULL,used_count INT UNSIGNED NOT NULL DEFAULT 0,starts_at DATETIME NULL,expires_at DATETIME NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_by BIGINT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_coupons_active(active,starts_at,expires_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS coupon_redemptions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,coupon_id BIGINT UNSIGNED NOT NULL,reseller_id BIGINT UNSIGNED NOT NULL,order_id BIGINT UNSIGNED NULL,amount DECIMAL(14,2) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(coupon_id) REFERENCES coupons(id) ON DELETE CASCADE,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,UNIQUE KEY uq_coupon_order(coupon_id,order_id),INDEX idx_coupon_reseller(coupon_id,reseller_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS invoices (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,invoice_number VARCHAR(40) NOT NULL UNIQUE,reseller_id BIGINT UNSIGNED NOT NULL,order_id BIGINT UNSIGNED NULL,subtotal DECIMAL(14,2) NOT NULL DEFAULT 0.00,discount DECIMAL(14,2) NOT NULL DEFAULT 0.00,total DECIMAL(14,2) NOT NULL DEFAULT 0.00,status ENUM('unpaid','paid','cancelled','refunded') NOT NULL DEFAULT 'paid',due_at DATETIME NULL,paid_at DATETIME NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,INDEX idx_invoice_reseller(reseller_id,created_at),INDEX idx_invoice_order(order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS invoice_items (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,invoice_id BIGINT UNSIGNED NOT NULL,description VARCHAR(255) NOT NULL,quantity DECIMAL(14,2) NOT NULL DEFAULT 1.00,unit_price DECIMAL(14,2) NOT NULL,amount DECIMAL(14,2) NOT NULL,FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS white_label_settings (reseller_id BIGINT UNSIGNED PRIMARY KEY,company_name VARCHAR(160) NULL,logo_url VARCHAR(500) NULL,support_email VARCHAR(190) NULL,website_url VARCHAR(500) NULL,brand_color VARCHAR(20) NULL,custom_domain VARCHAR(255) NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","CREATE TABLE IF NOT EXISTS cron_runs (job VARCHAR(80) PRIMARY KEY,last_run_at DATETIME NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4","ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(60) NULL","ALTER TABLE licenses ADD COLUMN package_id BIGINT UNSIGNED NULL","ALTER TABLE licenses ADD INDEX idx_license_package(package_id)","ALTER TABLE licenses ADD CONSTRAINT fk_license_package FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE SET NULL","ALTER TABLE orders ADD COLUMN coupon_discount DECIMAL(14,2) NOT NULL DEFAULT 0.00","UPDATE api_keys SET scopes=CONCAT(scopes,',licenses:manage') WHERE scopes NOT LIKE '%licenses:manage%'"];
+        $migrations['2026_09_28_order_idempotency'] = [
+            "ALTER TABLE orders ADD COLUMN external_ref VARCHAR(190) NULL",
+            "ALTER TABLE orders ADD UNIQUE KEY uq_orders_reseller_external (reseller_id,external_ref)"
+        ];
+        $migrations['2026_09_28_usdt_bep20_deposits'] = [
+            "ALTER TABLE deposit_requests ADD COLUMN network VARCHAR(30) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN tx_hash VARCHAR(66) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN block_number BIGINT UNSIGNED NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN from_address CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN to_address CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN token_contract CHAR(42) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN token_amount DECIMAL(36,18) NULL",
+            "ALTER TABLE deposit_requests ADD COLUMN verified_at DATETIME NULL",
+            "ALTER TABLE deposit_requests ADD UNIQUE KEY uq_deposit_tx_hash (tx_hash)"
+        ];
+        $migrations['2026_09_28_telegram_separate_bots'] = [
+            "ALTER TABLE telegram_settings ADD COLUMN license_bot_token VARCHAR(255) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN license_admin_chat_id VARCHAR(64) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN deposit_bot_token VARCHAR(255) NULL",
+            "ALTER TABLE telegram_settings ADD COLUMN deposit_admin_chat_id VARCHAR(64) NULL",
+            "UPDATE telegram_settings SET license_bot_token=bot_token WHERE id=1 AND (license_bot_token IS NULL OR license_bot_token='')",
+            "UPDATE telegram_settings SET license_admin_chat_id=admin_chat_id WHERE id=1 AND (license_admin_chat_id IS NULL OR license_admin_chat_id='')"
+        ];
+        $migrations['2026_09_29_reseller_levels'] = [
+            "ALTER TABLE resellers ADD COLUMN level_mode ENUM('auto','custom') NOT NULL DEFAULT 'auto'",
+            "ALTER TABLE resellers ADD COLUMN custom_level TINYINT UNSIGNED NULL",
+            "ALTER TABLE resellers ADD COLUMN level_updated_at DATETIME NULL",
+            "CREATE TABLE IF NOT EXISTS reseller_level_history (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,reseller_id BIGINT UNSIGNED NOT NULL,old_level TINYINT UNSIGNED NULL,new_level TINYINT UNSIGNED NOT NULL,mode ENUM('auto','custom') NOT NULL DEFAULT 'auto',reason VARCHAR(255) NULL,changed_by BIGINT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(changed_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_level_history_reseller (reseller_id,created_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
+        ];
+        $migrations['2026_09_29_payment_methods'] = [
+            "CREATE TABLE IF NOT EXISTS payment_methods (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(60) NOT NULL UNIQUE,name VARCHAR(120) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 1,min_amount DECIMAL(14,2) NOT NULL DEFAULT 1.00,instructions TEXT NULL,auto_verify TINYINT(1) NOT NULL DEFAULT 0,sort_order INT NOT NULL DEFAULT 0,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,INDEX idx_payment_methods_enabled_sort (enabled,sort_order)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT IGNORE INTO payment_methods(code,name,enabled,min_amount,instructions,auto_verify,sort_order) VALUES ('USDT_BEP20','USDT (BEP20 / BSC)',1,15.00,'Send USDT through BSC/BEP20 and submit the transaction hash. The blockchain transfer is verified automatically.',1,1),('bKash','bKash',1,15.00,'Pay using the SkyNoc-approved bKash payment instructions and submit the payment reference.',0,2),('Binance_Crypto','Binance / Crypto',1,15.00,'Follow the payment instructions provided by SkyNoc support and submit your payment reference.',0,3),('Bank_Transfer','Bank Transfer',1,15.00,'Complete the bank transfer and submit the transaction/reference number.',0,4),('Manual','Manual Payment',0,15.00,'Contact SkyNoc support for manual payment instructions.',0,5)"
+        ];
+        $migrations['2026_09_29_level_discounts'] = [
+            "CREATE TABLE IF NOT EXISTS reseller_level_discounts (level TINYINT UNSIGNED PRIMARY KEY,discount_percent DECIMAL(5,2) NOT NULL DEFAULT 0.00,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "INSERT IGNORE INTO reseller_level_discounts(level,discount_percent) VALUES (1,0.00),(2,0.00),(3,0.00),(4,0.00),(5,0.00)"
+        ];
+        $migrations['2026_09_30_payment_method_compat'] = [
+            "ALTER TABLE payment_methods ADD COLUMN min_deposit DECIMAL(14,2) NOT NULL DEFAULT 1.00",
+            "ALTER TABLE payment_methods ADD COLUMN config_json JSON NULL"
+        ];
+        $migrations['2026_09_29_platform_plus'] = [
+            "CREATE TABLE IF NOT EXISTS user_2fa (user_id BIGINT UNSIGNED PRIMARY KEY,secret VARCHAR(64) NOT NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,recovery_codes TEXT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS coupons (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,code VARCHAR(60) NOT NULL UNIQUE,type ENUM('percent','fixed') NOT NULL DEFAULT 'percent',value DECIMAL(14,2) NOT NULL,max_uses INT UNSIGNED NULL,used_count INT UNSIGNED NOT NULL DEFAULT 0,starts_at DATETIME NULL,expires_at DATETIME NULL,active TINYINT(1) NOT NULL DEFAULT 1,created_by BIGINT UNSIGNED NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(created_by) REFERENCES users(id) ON DELETE SET NULL,INDEX idx_coupons_active(active,starts_at,expires_at)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS coupon_redemptions (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,coupon_id BIGINT UNSIGNED NOT NULL,reseller_id BIGINT UNSIGNED NOT NULL,order_id BIGINT UNSIGNED NULL,amount DECIMAL(14,2) NOT NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(coupon_id) REFERENCES coupons(id) ON DELETE CASCADE,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,UNIQUE KEY uq_coupon_order(coupon_id,order_id),INDEX idx_coupon_reseller(coupon_id,reseller_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS invoices (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,invoice_number VARCHAR(40) NOT NULL UNIQUE,reseller_id BIGINT UNSIGNED NOT NULL,order_id BIGINT UNSIGNED NULL,subtotal DECIMAL(14,2) NOT NULL DEFAULT 0.00,discount DECIMAL(14,2) NOT NULL DEFAULT 0.00,total DECIMAL(14,2) NOT NULL DEFAULT 0.00,status ENUM('unpaid','paid','cancelled','refunded') NOT NULL DEFAULT 'paid',due_at DATETIME NULL,paid_at DATETIME NULL,created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE,FOREIGN KEY(order_id) REFERENCES orders(id) ON DELETE SET NULL,INDEX idx_invoice_reseller(reseller_id,created_at),INDEX idx_invoice_order(order_id)) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS invoice_items (id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,invoice_id BIGINT UNSIGNED NOT NULL,description VARCHAR(255) NOT NULL,quantity DECIMAL(14,2) NOT NULL DEFAULT 1.00,unit_price DECIMAL(14,2) NOT NULL,amount DECIMAL(14,2) NOT NULL,FOREIGN KEY(invoice_id) REFERENCES invoices(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS white_label_settings (reseller_id BIGINT UNSIGNED PRIMARY KEY,company_name VARCHAR(160) NULL,logo_url VARCHAR(500) NULL,support_email VARCHAR(190) NULL,website_url VARCHAR(500) NULL,brand_color VARCHAR(20) NULL,custom_domain VARCHAR(255) NULL,enabled TINYINT(1) NOT NULL DEFAULT 0,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "CREATE TABLE IF NOT EXISTS cron_runs (job VARCHAR(80) PRIMARY KEY,last_run_at DATETIME NULL,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4",
+            "ALTER TABLE orders ADD COLUMN coupon_code VARCHAR(60) NULL",
+            "ALTER TABLE licenses ADD COLUMN package_id BIGINT UNSIGNED NULL",
+            "ALTER TABLE licenses ADD INDEX idx_license_package(package_id)",
+            "ALTER TABLE licenses ADD CONSTRAINT fk_license_package FOREIGN KEY(package_id) REFERENCES packages(id) ON DELETE SET NULL",
+            "ALTER TABLE orders ADD COLUMN coupon_discount DECIMAL(14,2) NOT NULL DEFAULT 0.00",
+            "UPDATE api_keys SET scopes=CONCAT(scopes,',licenses:manage') WHERE scopes NOT LIKE '%licenses:manage%'"
+        ];
         $migrations['2026_10_03_reseller_notifications'] = [
             "CREATE TABLE IF NOT EXISTS reseller_notification_settings (reseller_id BIGINT UNSIGNED PRIMARY KEY,email_enabled TINYINT(1) NOT NULL DEFAULT 1,discord_enabled TINYINT(1) NOT NULL DEFAULT 0,discord_webhook TEXT NULL,telegram_enabled TINYINT(1) NOT NULL DEFAULT 0,telegram_bot_token TEXT NULL,telegram_chat_id VARCHAR(100) NULL,low_balance_threshold DECIMAL(14,2) NOT NULL DEFAULT 5.00,updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,FOREIGN KEY(reseller_id) REFERENCES resellers(id) ON DELETE CASCADE) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4"
         ];
@@ -55,11 +112,19 @@ function skynoc_migrate(PDO $db): void
             $check = $db->prepare('SELECT 1 FROM schema_migrations WHERE version=? LIMIT 1');
             $check->execute([$version]);
             if ($check->fetchColumn()) continue;
+
             foreach ($queries as $sql) {
-                try { $db->exec($sql); }
-                catch (PDOException $e) {
+                try {
+                    $db->exec($sql);
+                } catch (PDOException $e) {
                     $message = strtolower($e->getMessage());
-                    if (str_contains($message,'duplicate column') || str_contains($message,'duplicate field')) continue;
+                    $idempotent = str_contains($message, 'duplicate column')
+                        || str_contains($message, 'duplicate field')
+                        || str_contains($message, 'duplicate key name')
+                        || str_contains($message, 'duplicate key')
+                        || str_contains($message, 'duplicate constraint')
+                        || str_contains($message, 'already exists');
+                    if ($idempotent) continue;
                     throw $e;
                 }
             }
