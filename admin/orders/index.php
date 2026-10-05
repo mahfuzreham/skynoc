@@ -1,0 +1,4 @@
+<?php
+$section='orders'; ob_start(); require __DIR__.'/../../public/admin.php'; $html=ob_get_clean();
+$script="<script>(function(){var c=document.querySelector('.content');if(!c)return;var h=[...c.querySelectorAll('.section-head')].find(x=>x.querySelector('h2')&&x.querySelector('h2').textContent.trim().toLowerCase()==='reseller orders');if(!h)return;[...c.children].forEach(e=>{if(!e.classList.contains('page-head')&&!e.classList.contains('notice')&&!e.classList.contains('stats'))e.style.display='none'});h.style.display='flex';if(h.nextElementSibling)h.nextElementSibling.style.display='';document.querySelectorAll('.side-link').forEach(a=>{if(a.getAttribute('href')==='#orders')a.href='/admin/orders'});document.title='SkyNoc Admin • Orders'})()</script>";
+echo str_replace('</body>',$script.'</body>',$html);
