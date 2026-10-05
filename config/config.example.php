@@ -6,7 +6,8 @@ return [
     'base_url' => 'https://SkyNoc.Net',
     'timezone' => 'Asia/Dhaka',
     'session_name' => 'skynoc_session',
-    'auto_migrate' => true,
+    // Production: run `php tools/migrate.php` during deployment instead of migrating on web requests.
+    'auto_migrate' => false,
     'mail' => [
         'from' => 'no-reply@skynoc.net',
     ],
