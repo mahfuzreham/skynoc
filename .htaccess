@@ -12,21 +12,17 @@ RewriteEngine On
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
 
-# Hostname subdomain
 RewriteCond %{HTTP_HOST} ^hostname\.skynoc\.net$ [NC]
 RewriteRule ^$ public/hostname.php [L,QSA]
 
-# Shared admin assets
 RewriteRule ^admin-page-ui\.css$ public/admin-page-ui.css [L]
 RewriteRule ^admin-page-router\.js$ public/admin-page-router.js [L]
 
-# Telegram / API endpoints
 RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
 RewriteRule ^telegram/orders/?$ public/telegram-orders.php [L,QSA]
 RewriteRule ^api/v1/whmcs/invoice-paid/?$ api/v1/whmcs-invoice-paid.php [L,QSA]
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
 
-# Public application
 RewriteRule ^$ public/index.php [L]
 RewriteRule ^login/?$ public/login.php [L,QSA]
 RewriteRule ^reseller/register/?$ public/reseller-register.php [L,QSA]
@@ -43,7 +39,7 @@ RewriteRule ^invoice/?$ public/invoice.php [L,QSA]
 RewriteRule ^cron/?$ public/cron.php [L,QSA]
 RewriteRule ^reseller/levels/?$ public/reseller-levels.php [L,QSA]
 
-# Admin dashboard and verified admin pages
+# Admin dashboard and verified/compatibility admin pages
 RewriteRule ^admin/?$ public/admin-dashboard.php [L,QSA]
 RewriteRule ^admin/dashboard/?$ public/admin-dashboard.php [L,QSA]
 RewriteRule ^admin/packages/?$ public/admin-packages.php [L,QSA]
@@ -64,7 +60,7 @@ RewriteRule ^admin/reseller-funds/?$ public/admin-reseller-funds.php [L,QSA]
 RewriteRule ^admin/reseller-levels/?$ public/admin-reseller-levels.php [L,QSA]
 RewriteRule ^admin/reissues/?$ public/admin-reissues.php [L,QSA]
 RewriteRule ^admin/tickets/?$ public/admin-tickets.php [L,QSA]
-RewriteRule ^admin/providers/?$ public/admin-providers.php [L,QSA]
+RewriteRule ^admin/providers/?$ public/admin-provider-accounts.php [L,QSA]
 RewriteRule ^admin/hostname/?$ public/admin-hostname.php [L,QSA]
 RewriteRule ^admin/reports/?$ public/reports.php [L,QSA]
 RewriteRule ^admin/coupons/?$ public/admin-coupons.php [L,QSA]
@@ -83,8 +79,5 @@ RewriteRule ^admin/invoice-settings/?$ public/admin-invoice-settings.php [L,QSA]
 RewriteRule ^admin/settings/whitelabel/?$ public/admin-settings.php?section=whitelabel [L,QSA]
 RewriteRule ^admin/settings/?$ public/admin-settings.php [L,QSA]
 
-# Legacy direct PHP URLs
 RewriteRule ^(login|logout|dashboard|admin|reseller)\.php$ /$1 [R=301,L]
-
-# Protect application internals
 RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
