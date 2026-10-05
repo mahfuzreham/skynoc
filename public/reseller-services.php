@@ -1,0 +1,39 @@
+<?php
+require __DIR__ . '/../app/bootstrap.php';
+$u=require_role(['reseller']);
+$s=$db->prepare('SELECT id,status FROM resellers WHERE user_id=? LIMIT 1');$s->execute([$u['id']]);$r=$s->fetch();if(!$r)exit('Reseller profile not found.');$rid=(int)$r['id'];$msg=null;$error=null;
+try{
+ if($_SERVER['REQUEST_METHOD']==='POST'){
+  verify_csrf();$action=(string)($_POST['action']??'');$licenseId=(int)($_POST['license_id']??0);
+  if($action==='renew'){
+   $db->beginTransaction();
+   $q=$db->prepare("SELECT l.*,p.name package_name,p.price,p.billing_period FROM licenses l JOIN packages p ON p.id=l.package_id WHERE l.id=? AND l.reseller_id=? FOR UPDATE");$q->execute([$licenseId,$rid]);$l=$q->fetch();
+   if(!$l)throw new RuntimeException('Service not found.');
+   if(!in_array($l['billing_period'],['monthly','annual'],true))throw new RuntimeException('This package does not support renewal.');
+   if($l['status']==='cancelled')throw new RuntimeException('Cancelled services cannot be renewed.');
+   $amount=round((float)$l['price'],2);if($amount<=0)throw new RuntimeException('Invalid renewal price.');
+   wallet_debit($rid,$amount,'purchase','RENEW-LIC-'.$licenseId.'-'.date('YmdHis'),'Manual renewal: '.$l['package_name'].' / '.$l['license_key'],null,$u['id']);
+   $base=(isset($l['expires_at'])&&$l['expires_at']&&strtotime((string)$l['expires_at'])>time())?new DateTimeImmutable((string)$l['expires_at']):new DateTimeImmutable('now');
+   $newExpiry=$l['billing_period']==='annual'?$base->modify('+1 year'):$base->modify('+1 month');
+   $db->prepare("UPDATE licenses SET status='active',expires_at=?,updated_at=NOW() WHERE id=? AND reseller_id=?")->execute([$newExpiry->format('Y-m-d H:i:s'),$licenseId,$rid]);
+   $db->prepare('INSERT INTO license_history(license_id,user_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?,?)')->execute([$licenseId,$u['id'],'renewed',$l['domain'],$l['domain'],'Manual reseller renewal charged $'.number_format($amount,2)]);
+   $db->commit();
+   notify_reseller($rid,'license_renewed','Service renewed','License '.$l['license_key'].' renewed until '.$newExpiry->format('Y-m-d H:i:s').'.');
+   $msg='Service renewed successfully until '.$newExpiry->format('Y-m-d H:i:s').'.';
+  }
+  if($action==='cancel'){
+   $db->beginTransaction();
+   $q=$db->prepare("SELECT l.*,p.name package_name FROM licenses l JOIN packages p ON p.id=l.package_id WHERE l.id=? AND l.reseller_id=? FOR UPDATE");$q->execute([$licenseId,$rid]);$l=$q->fetch();
+   if(!$l)throw new RuntimeException('Service not found.');
+   if($l['status']==='cancelled')throw new RuntimeException('Service is already cancelled.');
+   $db->prepare("UPDATE licenses SET status='cancelled',updated_at=NOW() WHERE id=? AND reseller_id=?")->execute([$licenseId,$rid]);
+   $db->prepare('INSERT INTO license_history(license_id,user_id,action,old_domain,new_domain,notes) VALUES(?,?,?,?,?,?)')->execute([$licenseId,$u['id'],'cancelled',$l['domain'],$l['domain'],'Cancelled by reseller; automatic renewal disabled.']);
+   $db->commit();
+   notify_reseller($rid,'license_cancelled','Service cancelled','License '.$l['license_key'].' has been cancelled.');
+   $msg='Service cancelled. Future automatic renewal will stop.';
+  }
+ }
+}catch(Throwable $e){if($db->inTransaction())$db->rollBack();$error=$e->getMessage();}
+$q=$db->prepare("SELECT l.id,l.license_key,l.domain,l.status,l.purchase_date,l.expires_at,l.package_id,p.name package_name,p.price,p.billing_period,(SELECT COUNT(*) FROM wallet_transactions wt WHERE wt.reseller_id=l.reseller_id AND wt.reference LIKE CONCAT('RENEW-LIC-',l.id,'-%')) renew_count FROM licenses l JOIN packages p ON p.id=l.package_id WHERE l.reseller_id=? ORDER BY l.id DESC LIMIT 100");$q->execute([$rid]);$services=$q->fetchAll();$wallet=reseller_wallet($rid);
+?><!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>My Services — SkyNoc</title><link rel="stylesheet" href="/admin-page-ui.css"><style>.hero{background:linear-gradient(135deg,#101828,#1d4ed8);color:#fff;border-radius:18px;padding:24px;margin-bottom:18px}.hero h1{margin:5px 0}.wallet{font-size:13px;color:#dbe4ff}.service{background:#fff;border:1px solid #e4e7ec;border-radius:16px;padding:18px;margin:12px 0;box-shadow:0 7px 24px rgba(16,24,40,.05)}.service-head{display:flex;justify-content:space-between;gap:12px;align-items:flex-start}.meta{font-size:12px;color:#667085;line-height:1.8;margin-top:8px}.badge{display:inline-block;padding:5px 9px;border-radius:999px;font-size:10px;font-weight:800}.active{background:#ecfdf3;color:#067647}.suspended{background:#fffaeb;color:#92400e}.cancelled{background:#fef3f2;color:#b42318}.expired{background:#f2f4f7;color:#475467}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:13px}.actions button{min-width:120px}.cancel{background:#b42318!important}.empty{padding:20px;border:1px dashed #d0d5dd;border-radius:12px;color:#667085}@media(max-width:650px){.service-head{flex-direction:column}.actions button{width:100%}}</style></head><body><div class="top"><strong>SkyNoc / My Services</strong><span><?=e($u['name'])?> · <a href="/reseller/manage">Dashboard</a></span></div><div class="wrap"><div class="hero"><div style="font-size:11px;font-weight:800;letter-spacing:.08em;opacity:.8">RESELLER SERVICES</div><h1>Packages & Orders</h1><div class="wallet">Wallet balance: <b>$<?=number_format($wallet,2)?></b> · First activation can be manual; monthly/annual services can then be renewed automatically or manually.</div></div><?php if($msg):?><div class="msg">✓ <?=e($msg)?></div><?php endif;?><?php if($error):?><div class="err">! <?=e($error)?></div><?php endif;?>
+<section class="card"><h2>My Services</h2><p class="muted">Each active service has <b>Renew</b> and <b>Cancel</b>. Automatic billing only runs while the service remains active.</p><?php if(!$services):?><div class="empty">No services yet. Purchase a package from the reseller dashboard.</div><?php endif;?><?php foreach($services as $s):?><article class="service"><div class="service-head"><div><strong>#<?=$s['id']?> · <?=e($s['package_name'])?></strong><div class="meta">🔑 License: <code><?=e($s['license_key'])?></code><br>🌐 Domain: <?=e($s['domain']?:'-')?><br>💵 Renewal: $<?=number_format((float)$s['price'],2)?> / <?=e($s['billing_period'])?><br>📅 Expires: <?=e($s['expires_at']?:'No expiry')?><?php if((int)$s['renew_count']>0):?><br>↻ Previous renewals: <?=number_format((int)$s['renew_count'])?><?php endif;?></div></div><span class="badge <?=e($s['status'])?>"><?=e(strtoupper($s['status']))?></span></div><?php if(in_array($s['status'],['active','suspended'],true)&&in_array($s['billing_period'],['monthly','annual'],true)):?><div class="actions"><form method="post"><?=csrf_field()?><input type="hidden" name="action" value="renew"><input type="hidden" name="license_id" value="<?=$s['id']?>"><button type="submit">↻ Renew $<?=number_format((float)$s['price'],2)?></button></form><form method="post" onsubmit="return confirm('Cancel this service? Future automatic renewal will stop.')"><?=csrf_field()?><input type="hidden" name="action" value="cancel"><input type="hidden" name="license_id" value="<?=$s['id']?>"><button class="cancel" type="submit">✕ Cancel Service</button></form></div><?php elseif($s['status']==='cancelled'):?><div class="meta">Cancelled — no future automatic renewal.</div><?php else:?><div class="meta">This package is one-time or not currently renewable.</div><?php endif;?></article><?php endforeach;?></section><div class="page-footer">SkyNoc Reseller · <a href="/reseller/manage">Back to dashboard</a></div></div></body></html>
