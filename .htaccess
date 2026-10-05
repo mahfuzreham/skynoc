@@ -18,6 +18,8 @@ RewriteRule ^$ public/hostname.php [L,QSA]
 RewriteRule ^admin-page-ui\.css$ public/admin-page-ui.css [L]
 RewriteRule ^admin-page-router\.js$ public/admin-page-router.js [L]
 
+# Telegram webhook: keep the public URL stable while the PHP endpoint stays outside the web root.
+RewriteRule ^telegram-webhook\.php$ public/telegram-webhook.php [L,QSA]
 RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
 RewriteRule ^telegram/orders/?$ public/telegram-orders.php [L,QSA]
 RewriteRule ^api/v1/whmcs/invoice-paid/?$ api/v1/whmcs-invoice-paid.php [L,QSA]
