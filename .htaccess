@@ -1,28 +1,37 @@
 Options -Indexes
 RewriteEngine On
+
 <FilesMatch "^(config\.php|config\.example\.php|schema\.sql|migration_existing\.sql|\.env.*)$">
     Require all denied
 </FilesMatch>
+
 <IfModule mod_headers.c>
     Header always set X-Content-Type-Options "nosniff"
     Header always set X-Frame-Options "SAMEORIGIN"
     Header always set Referrer-Policy "strict-origin-when-cross-origin"
     Header always set Permissions-Policy "camera=(), microphone=(), geolocation=()"
 </IfModule>
+
+# Hostname subdomain
 RewriteCond %{HTTP_HOST} ^hostname\.skynoc\.net$ [NC]
 RewriteRule ^$ public/hostname.php [L,QSA]
+
+# Shared admin assets
 RewriteRule ^admin-page-ui\.css$ public/admin-page-ui.css [L]
 RewriteRule ^admin-page-router\.js$ public/admin-page-router.js [L]
+
+# Telegram / API endpoints
 RewriteRule ^telegram/control/?$ public/telegram-control.php [L,QSA]
 RewriteRule ^telegram/orders/?$ public/telegram-orders.php [L,QSA]
 RewriteRule ^api/v1/whmcs/invoice-paid/?$ api/v1/whmcs-invoice-paid.php [L,QSA]
 RewriteRule ^api/v1(?:/.*)?$ api/v1/index.php [L,QSA]
+
+# Public application
 RewriteRule ^$ public/index.php [L]
 RewriteRule ^login/?$ public/login.php [L,QSA]
 RewriteRule ^reseller/register/?$ public/reseller-register.php [L,QSA]
 RewriteRule ^logout/?$ public/logout.php [L,QSA]
 RewriteRule ^dashboard/?$ public/dashboard.php [L,QSA]
-RewriteRule ^admin/?$ /admin/dashboard [R=302,L]
 RewriteRule ^reseller/?$ public/reseller-home.php [L,QSA]
 RewriteRule ^reseller/menu/?$ public/reseller-links.php [L,QSA]
 RewriteRule ^reseller/manage/?$ public/reseller.php [L,QSA]
@@ -34,7 +43,8 @@ RewriteRule ^invoice/?$ public/invoice.php [L,QSA]
 RewriteRule ^cron/?$ public/cron.php [L,QSA]
 RewriteRule ^reseller/levels/?$ public/reseller-levels.php [L,QSA]
 
-# Admin pages
+# Admin dashboard and verified admin pages
+RewriteRule ^admin/?$ public/admin-dashboard.php [L,QSA]
 RewriteRule ^admin/dashboard/?$ public/admin-dashboard.php [L,QSA]
 RewriteRule ^admin/packages/?$ public/admin-packages.php [L,QSA]
 RewriteRule ^admin/orders/?$ public/admin-orders.php [L,QSA]
@@ -47,7 +57,9 @@ RewriteRule ^admin/order-fulfill/?$ public/admin-order-fulfill.php [L,QSA]
 RewriteRule ^admin/renew/?$ public/admin-renew.php [L,QSA]
 RewriteRule ^admin/package-pricing/?$ public/admin-package-pricing.php [L,QSA]
 RewriteRule ^admin/reseller-activate/?$ public/admin-reseller-activate.php [L,QSA]
-RewriteRule ^admin/resellers/?$ public/admin-resellers.php [L,QSA]
+RewriteRule ^admin/reseller-manage/?$ public/admin-reseller-manage.php [L,QSA]
+RewriteRule ^admin/resellers/?$ public/admin-reseller-manage.php [L,QSA]
+RewriteRule ^admin/reseller-add/?$ public/admin-reseller-add.php [L,QSA]
 RewriteRule ^admin/reseller-funds/?$ public/admin-reseller-funds.php [L,QSA]
 RewriteRule ^admin/reseller-levels/?$ public/admin-reseller-levels.php [L,QSA]
 RewriteRule ^admin/reissues/?$ public/admin-reissues.php [L,QSA]
@@ -58,6 +70,9 @@ RewriteRule ^admin/reports/?$ public/reports.php [L,QSA]
 RewriteRule ^admin/coupons/?$ public/admin-coupons.php [L,QSA]
 RewriteRule ^admin/api-keys/?$ public/admin-api-keys.php [L,QSA]
 RewriteRule ^admin/staff/?$ public/admin-staff.php [L,QSA]
+RewriteRule ^admin/user-management/?$ public/admin-user-management.php [L,QSA]
+
+# Admin settings
 RewriteRule ^admin/settings/payments/?$ public/admin-payment-settings.php [L,QSA]
 RewriteRule ^admin/settings/binance/?$ public/admin-binance.php [L,QSA]
 RewriteRule ^admin/settings/discord/?$ public/admin-discord.php [L,QSA]
@@ -68,8 +83,8 @@ RewriteRule ^admin/invoice-settings/?$ public/admin-invoice-settings.php [L,QSA]
 RewriteRule ^admin/settings/whitelabel/?$ public/admin-settings.php?section=whitelabel [L,QSA]
 RewriteRule ^admin/settings/?$ public/admin-settings.php [L,QSA]
 
-# Legacy / direct admin routes
-RewriteRule ^admin/?$ public/admin.php [L,QSA]
-RewriteRule ^admin-page-ui\.css$ public/admin-page-ui.css [L]
+# Legacy direct PHP URLs
 RewriteRule ^(login|logout|dashboard|admin|reseller)\.php$ /$1 [R=301,L]
+
+# Protect application internals
 RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
