@@ -1,0 +1,4 @@
+<?php
+$section='reissues'; ob_start(); require __DIR__.'/../../public/admin.php'; $html=ob_get_clean();
+$script="<script>(function(){var c=document.querySelector('.content');if(!c)return;var h=[...c.querySelectorAll('.section-head')].find(x=>x.querySelector('h2')&&x.querySelector('h2').textContent.trim().toLowerCase().indexOf('reissue')===0);if(!h)return;[...c.children].forEach(e=>{if(!e.classList.contains('page-head')&&!e.classList.contains('notice')&&!e.classList.contains('stats'))e.style.display='none'});h.style.display='flex';if(h.nextElementSibling)h.nextElementSibling.style.display='';document.title='SkyNoc Admin • Reissues'})()</script>";
+echo str_replace('</body>',$script.'</body>',$html);
