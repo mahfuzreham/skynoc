@@ -1,102 +1,55 @@
 <?php
 declare(strict_types=1);
 require __DIR__ . '/../app/bootstrap.php';
-$u = require_role(['owner','admin','manager','staff']);
-if (!can('license.manage', $u) && !in_array($u['role'], ['owner','admin'], true)) { http_response_code(403); exit('Forbidden'); }
+$u=require_role(['owner','admin','manager','staff']);
+if (!can('license.manage',$u) && !in_array($u['role'],['owner','admin'],true)) { http_response_code(403); exit('Forbidden'); }
 
-$totalLicenses = (int)$db->query("SELECT COUNT(*) FROM licenses")->fetchColumn();
-$activeLicenses = (int)$db->query("SELECT COUNT(*) FROM licenses WHERE status='active'")->fetchColumn();
-$totalResellers = (int)$db->query("SELECT COUNT(*) FROM resellers")->fetchColumn();
-$activeResellers = (int)$db->query("SELECT COUNT(*) FROM resellers WHERE status='active'")->fetchColumn();
-$totalOrders = (int)$db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
-$completedOrders = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status='completed'")->fetchColumn();
-$totalRevenue = (float)$db->query("SELECT COALESCE(SUM(amount),0) FROM orders WHERE status='completed'")->fetchColumn();
-$totalCost = (float)$db->query("SELECT COALESCE(SUM(p.buy_price),0) FROM orders o JOIN packages p ON p.id=o.package_id WHERE o.status='completed'")->fetchColumn();
-$totalProfit = $totalRevenue - $totalCost;
-$pendingActivation = (int)$db->query("SELECT COUNT(*) FROM resellers WHERE status='pending'")->fetchColumn();
-$pendingOrders = (int)$db->query("SELECT COUNT(*) FROM orders WHERE status IN ('pending','processing')")->fetchColumn();
-$availableLicenses = (int)$db->query("SELECT COUNT(*) FROM licenses WHERE status='available' AND reseller_id IS NULL")->fetchColumn();
-$activePackages = (int)$db->query("SELECT COUNT(*) FROM packages WHERE active=1")->fetchColumn();
-$pendingDeposits = (int)$db->query("SELECT COUNT(*) FROM deposit_requests WHERE status='pending'")->fetchColumn();
-$recent = $db->query("SELECT o.id,o.amount,o.status,o.created_at,r.name reseller_name,p.name package_name,p.buy_price FROM orders o JOIN resellers r ON r.id=o.reseller_id JOIN packages p ON p.id=o.package_id ORDER BY o.id DESC LIMIT 10")->fetchAll();
-function money(float $v): string { return number_format($v, 2); }
+$totalLicenses=(int)$db->query("SELECT COUNT(*) FROM licenses")->fetchColumn();
+$activeLicenses=(int)$db->query("SELECT COUNT(*) FROM licenses WHERE status='active'")->fetchColumn();
+$availableLicenses=(int)$db->query("SELECT COUNT(*) FROM licenses WHERE status='available' AND reseller_id IS NULL")->fetchColumn();
+$totalResellers=(int)$db->query("SELECT COUNT(*) FROM resellers")->fetchColumn();
+$activeResellers=(int)$db->query("SELECT COUNT(*) FROM resellers WHERE status='active'")->fetchColumn();
+$pendingActivation=(int)$db->query("SELECT COUNT(*) FROM resellers WHERE status='pending'")->fetchColumn();
+$totalOrders=(int)$db->query("SELECT COUNT(*) FROM orders")->fetchColumn();
+$completedOrders=(int)$db->query("SELECT COUNT(*) FROM orders WHERE status='completed'")->fetchColumn();
+$pendingOrders=(int)$db->query("SELECT COUNT(*) FROM orders WHERE status IN ('pending','processing')")->fetchColumn();
+$totalRevenue=(float)$db->query("SELECT COALESCE(SUM(amount),0) FROM orders WHERE status='completed'")->fetchColumn();
+$totalCost=(float)$db->query("SELECT COALESCE(SUM(COALESCE(buy_cost,0)),0) FROM orders WHERE status='completed'")->fetchColumn();
+$totalProfit=$totalRevenue-$totalCost;
+$activePackages=(int)$db->query("SELECT COUNT(*) FROM packages WHERE active=1")->fetchColumn();
+$pendingDeposits=(int)$db->query("SELECT COUNT(*) FROM deposit_requests WHERE status='pending'")->fetchColumn();
+$recent=$db->query("SELECT o.id,o.amount,o.buy_cost,o.status,o.created_at,r.name reseller_name,p.name package_name FROM orders o JOIN resellers r ON r.id=o.reseller_id JOIN packages p ON p.id=o.package_id ORDER BY o.id DESC LIMIT 10")->fetchAll();
+function money(float $v):string{return number_format($v,2);}
 ?>
 <!doctype html>
 <html lang="en">
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>SkyNoc Admin • Live Overview</title>
-<link rel="stylesheet" href="/admin-page-ui.css">
+<title>SkyNoc Admin • Dashboard</title>
 <style>
-:root{--blue:#465fff;--ink:#101828;--muted:#667085;--line:#e4e7ec;--bg:#f5f7fb;--card:#fff;--nav:#fff}
-*{box-sizing:border-box}html,body{min-height:100%;overflow-x:hidden}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}
-.admin-shell{min-height:100vh;display:flex}.sidebar{position:fixed;z-index:30;left:0;top:0;bottom:0;width:270px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;transition:transform .2s ease}.sidebar-head{height:72px;display:flex;align-items:center;gap:11px;padding:0 18px;border-bottom:1px solid #f0f2f5;position:sticky;top:0;background:#fff;z-index:2}.brand-mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#465fff,#7b8cff);color:#fff;display:grid;place-items:center;font-weight:900;box-shadow:0 8px 20px rgba(70,95,255,.2)}.brand-title{font-weight:850;letter-spacing:-.02em}.brand-sub{font-size:10px;color:#98a2b3;margin-top:1px}.sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid #f0f2f5}.sidebar-user{font-size:12px;font-weight:800;color:#344054;padding:9px 10px}.sidebar-user small{display:block;color:#98a2b3;font-weight:500;margin-top:2px}.sidebar-footer a{display:block;padding:9px 10px;color:#475467;font-size:12px;font-weight:700;text-decoration:none;border-radius:8px}.sidebar-footer a:hover{background:#f2f4f7}.main{width:calc(100% - 270px);margin-left:270px;min-width:0}.mobile-top{display:none;height:62px;align-items:center;justify-content:space-between;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}.menu-btn{border:1px solid var(--line);background:#fff;color:#344054;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer}.overlay{display:none;position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:25}.content{max-width:1500px;margin:0 auto;padding:24px}.hero{border-radius:22px;padding:26px 28px;color:#fff;background:linear-gradient(135deg,#101828,#1d2939 45%,#465fff);box-shadow:0 18px 45px rgba(16,24,40,.16);margin-bottom:18px}.hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.hero h1{margin:5px 0;font-size:29px;letter-spacing:-.035em}.hero p{margin:0;color:#dbe4ff;max-width:820px;font-size:13px}.eyebrow{font-size:10px;font-weight:850;letter-spacing:.12em;color:#b9c7ff}.hero-user{text-align:right;font-size:12px;color:#dbe4ff}.hero-user strong{display:block;color:#fff;font-size:14px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-flex;align-items:center;text-decoration:none!important;background:#fff;color:#24336f!important;padding:10px 13px;border-radius:10px;font-weight:800;font-size:12px}.btn.dark{background:rgba(255,255,255,.13);color:#fff!important;border:1px solid rgba(255,255,255,.2)}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(16,24,40,.04)}.metric .label{font-size:11px;color:#667085;font-weight:800;letter-spacing:.05em}.metric .value{font-size:27px;font-weight:850;margin:6px 0}.metric .sub{font-size:11px;color:#667085}.metric.profit{border-color:#b7ebcd}.metric.profit .value{color:#067647}.metric.warn{border-color:#fedf89}.metric.warn .value{color:#b54708}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(16,24,40,.04)}.card h2{font-size:16px;margin:0 0 4px}.muted{font-size:12px;color:#667085}.quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}.quick{border:1px solid #e4e7ec;border-radius:11px;padding:12px;text-decoration:none;color:#344054;background:#fcfcfd}.quick:hover{border-color:#b9c7ff;background:#f8faff}.quick strong{display:block;font-size:12px}.quick span{display:block;font-size:10px;color:#98a2b3;margin-top:3px}.table-wrap{overflow:auto;margin-top:12px}.table{width:100%;min-width:820px;border-collapse:collapse}.table th,.table td{padding:11px 9px;border-bottom:1px solid #eaecf0;text-align:left;font-size:12px}.table th{font-size:10px;text-transform:uppercase;color:#667085}.status{font-size:10px;font-weight:850;border-radius:999px;padding:4px 8px;background:#f2f4f7}.status.completed{background:#ecfdf3;color:#067647}.status.pending,.status.processing{background:#fffaeb;color:#b54708}.status.rejected,.status.refunded{background:#fef3f2;color:#b42318}.footer-note{text-align:center;color:#98a2b3;font-size:10px;padding:18px 0 8px}
-@media(max-width:1050px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}
-@media(max-width:900px){.sidebar{transform:translateX(-102%);box-shadow:12px 0 35px rgba(16,24,40,.15)}.sidebar.open{transform:translateX(0)}.main{width:100%;margin-left:0}.mobile-top{display:flex}.overlay.show{display:block}.content{padding:16px}}
-@media(max-width:600px){.grid,.two,.quick-grid{grid-template-columns:1fr}.hero{padding:21px}.hero-top{flex-direction:column}.hero-user{text-align:left}.hero h1{font-size:24px}.content{padding:12px}.metric .value{font-size:24px}}
+:root{--ink:#101828;--muted:#667085;--line:#e4e7ec;--bg:#f5f7fb;--card:#fff;--blue:#465fff}*{box-sizing:border-box}html,body{min-height:100%;overflow-x:hidden}body{margin:0;background:var(--bg);color:var(--ink);font-family:Inter,ui-sans-serif,system-ui,-apple-system,"Segoe UI",sans-serif}.admin-shell{min-height:100vh;display:flex}.sidebar{position:fixed;z-index:30;left:0;top:0;bottom:0;width:270px;background:#fff;border-right:1px solid var(--line);display:flex;flex-direction:column;overflow-y:auto;transition:transform .2s ease}.sidebar-head{height:72px;display:flex;align-items:center;gap:11px;padding:0 18px;border-bottom:1px solid #f0f2f5;position:sticky;top:0;background:#fff;z-index:2}.brand-mark{width:38px;height:38px;border-radius:11px;background:linear-gradient(135deg,#465fff,#7b8cff);color:#fff;display:grid;place-items:center;font-weight:900}.brand-title{font-weight:850;letter-spacing:-.02em}.brand-sub{font-size:10px;color:#98a2b3;margin-top:1px}.sidebar-footer{margin-top:auto;padding:12px;border-top:1px solid #f0f2f5}.sidebar-user{font-size:12px;font-weight:800;color:#344054;padding:9px 10px}.sidebar-user small{display:block;color:#98a2b3;font-weight:500;margin-top:2px}.sidebar-footer a{display:block;padding:9px 10px;color:#475467;font-size:12px;font-weight:700;text-decoration:none;border-radius:8px}.sidebar-footer a:hover{background:#f2f4f7}.main{width:calc(100% - 270px);margin-left:270px;min-width:0}.mobile-top{display:none;height:62px;align-items:center;justify-content:space-between;padding:0 14px;background:#fff;border-bottom:1px solid var(--line);position:sticky;top:0;z-index:20}.menu-btn{border:1px solid var(--line);background:#fff;color:#344054;border-radius:9px;padding:8px 11px;font-weight:800;cursor:pointer}.overlay{display:none;position:fixed;inset:0;background:rgba(16,24,40,.42);z-index:25}.content{max-width:1500px;margin:0 auto;padding:24px}.hero{border-radius:22px;padding:26px 28px;color:#fff;background:linear-gradient(135deg,#101828,#1d2939 45%,#465fff);box-shadow:0 18px 45px rgba(16,24,40,.16);margin-bottom:18px}.hero-top{display:flex;justify-content:space-between;gap:18px;align-items:flex-start}.hero h1{margin:5px 0;font-size:29px;letter-spacing:-.035em}.hero p{margin:0;color:#dbe4ff;max-width:820px;font-size:13px}.eyebrow{font-size:10px;font-weight:850;letter-spacing:.12em;color:#b9c7ff}.hero-user{text-align:right;font-size:12px;color:#dbe4ff}.hero-user strong{display:block;color:#fff;font-size:14px}.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:18px}.btn{display:inline-flex;align-items:center;text-decoration:none;background:#fff;color:#24336f;padding:10px 13px;border-radius:10px;font-weight:800;font-size:12px}.btn.dark{background:rgba(255,255,255,.13);color:#fff;border:1px solid rgba(255,255,255,.2)}.grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:14px}.metric{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(16,24,40,.04)}.metric .label{font-size:11px;color:#667085;font-weight:800;letter-spacing:.05em}.metric .value{font-size:27px;font-weight:850;margin:6px 0}.metric .sub{font-size:11px;color:#667085}.metric.profit{border-color:#b7ebcd}.metric.profit .value{color:#067647}.metric.warn{border-color:#fedf89}.metric.warn .value{color:#b54708}.two{display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-top:14px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 18px rgba(16,24,40,.04)}.card h2{font-size:16px;margin:0 0 4px}.muted{font-size:12px;color:#667085}.quick-grid{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:9px;margin-top:14px}.quick{border:1px solid #e4e7ec;border-radius:11px;padding:12px;text-decoration:none;color:#344054;background:#fcfcfd}.quick:hover{border-color:#b9c7ff;background:#f8faff}.quick strong{display:block;font-size:12px}.quick span{display:block;font-size:10px;color:#98a2b3;margin-top:3px}.table-wrap{overflow:auto;margin-top:12px}.table{width:100%;min-width:820px;border-collapse:collapse}.table th,.table td{padding:11px 9px;border-bottom:1px solid #eaecf0;text-align:left;font-size:12px}.table th{font-size:10px;text-transform:uppercase;color:#667085}.status{font-size:10px;font-weight:850;border-radius:999px;padding:4px 8px;background:#f2f4f7}.status.completed{background:#ecfdf3;color:#067647}.status.pending,.status.processing{background:#fffaeb;color:#b54708}.status.rejected,.status.refunded{background:#fef3f2;color:#b42318}.footer-note{text-align:center;color:#98a2b3;font-size:10px;padding:18px 0 8px}
+@media(max-width:1050px){.grid{grid-template-columns:repeat(2,minmax(0,1fr))}.quick-grid{grid-template-columns:repeat(2,minmax(0,1fr))}}@media(max-width:900px){.sidebar{transform:translateX(-102%);box-shadow:12px 0 35px rgba(16,24,40,.15)}.sidebar.open{transform:translateX(0)}.main{width:100%;margin-left:0}.mobile-top{display:flex}.overlay.show{display:block}.content{padding:16px}}@media(max-width:600px){.grid,.two,.quick-grid{grid-template-columns:1fr}.hero{padding:21px}.hero-top{flex-direction:column}.hero-user{text-align:left}.hero h1{font-size:24px}.content{padding:12px}.metric .value{font-size:24px}}
 </style>
 </head>
 <body>
 <div class="admin-shell">
-  <aside class="sidebar" aria-label="Admin navigation">
-    <div class="sidebar-head"><div class="brand-mark">S</div><div><div class="brand-title">SkyNoc Admin</div><div class="brand-sub">Management Console</div></div></div>
-    <div style="padding:8px 0"></div>
-    <div class="sidebar-footer">
-      <div class="sidebar-user"><?=e($u['name'])?><small><?=e($u['role'])?> · Live system</small></div>
-      <a href="/">← Open SkyNoc</a>
-      <a href="/logout">Sign out</a>
-    </div>
-  </aside>
-  <div class="overlay" id="overlay"></div>
-  <main class="main">
-    <div class="mobile-top"><strong>SkyNoc Admin</strong><button class="menu-btn" id="menuBtn" type="button">☰ Menu</button></div>
-    <div class="content">
-      <section class="hero">
-        <div class="hero-top">
-          <div><div class="eyebrow">LIVE BUSINESS OVERVIEW</div><h1>License & Reseller Dashboard</h1><p>Real-time overview of licenses, reseller accounts, orders, revenue, cost and profit from the current production database.</p></div>
-          <div class="hero-user"><strong><?=e($u['name'])?></strong><?=e($u['role'])?> account</div>
-        </div>
-        <div class="actions">
-          <a class="btn" href="/admin/package-pricing">Package Pricing</a>
-          <a class="btn" href="/admin/reseller-funds">Wallet Funds</a>
-          <a class="btn" href="/admin/order-edit">Order & License Editor</a>
-          <a class="btn dark" href="/admin/reseller-activate">Pending Activations (<?=e((string)$pendingActivation)?>)</a>
-        </div>
-      </section>
-
-      <section class="grid">
-        <div class="metric"><div class="label">TOTAL LICENSES</div><div class="value"><?=number_format($totalLicenses)?></div><div class="sub"><?=number_format($activeLicenses)?> active · <?=number_format($availableLicenses)?> available</div></div>
-        <div class="metric"><div class="label">RESELLERS</div><div class="value"><?=number_format($totalResellers)?></div><div class="sub"><?=number_format($activeResellers)?> active · <?=number_format($pendingActivation)?> pending</div></div>
-        <div class="metric"><div class="label">SALES REVENUE</div><div class="value">$<?=money($totalRevenue)?></div><div class="sub"><?=number_format($completedOrders)?> completed orders</div></div>
-        <div class="metric profit"><div class="label">TOTAL PROFIT</div><div class="value">$<?=money($totalProfit)?></div><div class="sub">Revenue $<?=money($totalRevenue)?> − cost $<?=money($totalCost)?></div></div>
-      </section>
-
-      <section class="two">
-        <div class="card"><h2>Operations</h2><div class="muted">Live queue and platform status.</div><div class="quick-grid">
-          <a class="quick" href="/admin/orders"><strong><?=number_format($totalOrders)?> Orders</strong><span><?=number_format($pendingOrders)?> pending / processing</span></a>
-          <a class="quick" href="/admin/deposits"><strong><?=number_format($pendingDeposits)?> Deposits</strong><span>Waiting for review</span></a>
-          <a class="quick" href="/admin/packages"><strong><?=number_format($activePackages)?> Packages</strong><span>Currently enabled</span></a>
-          <a class="quick" href="/admin/licenses"><strong><?=number_format($availableLicenses)?> Licenses</strong><span>Available inventory</span></a>
-          <a class="quick" href="/admin/reissues"><strong>License Reissues</strong><span>Manage reissue requests</span></a>
-          <a class="quick" href="/admin/tickets"><strong>Support Tickets</strong><span>Open support workflow</span></a>
-        </div></div>
-        <div class="card"><h2>Financial Summary</h2><div class="muted">Completed-order accounting.</div><div class="quick-grid">
-          <a class="quick" href="/admin/package-pricing"><strong>Sales $<?=money($totalRevenue)?></strong><span>Total completed revenue</span></a>
-          <a class="quick" href="/admin/package-pricing"><strong>Cost $<?=money($totalCost)?></strong><span>Configured package buy cost</span></a>
-          <a class="quick" href="/admin/package-pricing"><strong>Profit $<?=money($totalProfit)?></strong><span>Revenue minus buy cost</span></a>
-          <a class="quick" href="/admin/reports"><strong>Reports</strong><span>Detailed business reports</span></a>
-          <a class="quick" href="/admin/reseller-funds"><strong>Reseller Funds</strong><span>Credit / debit wallets</span></a>
-          <a class="quick" href="/admin/coupons"><strong>Coupons</strong><span>Discount management</span></a>
-        </div></div>
-      </section>
-
-      <section class="card" style="margin-top:14px"><h2>Recent Orders</h2><div class="muted">Latest order activity with live sales, cost and profit.</div><div class="table-wrap"><table class="table"><thead><tr><th>Order</th><th>Reseller</th><th>Package</th><th>Sales</th><th>Buy Cost</th><th>Profit</th><th>Status</th><th>Date</th></tr></thead><tbody>
-      <?php foreach($recent as $o): $profit=(float)$o['amount']-(float)$o['buy_price']; ?><tr><td>#<?=e((string)$o['id'])?></td><td><?=e($o['reseller_name'])?></td><td><?=e($o['package_name'])?></td><td>$<?=money((float)$o['amount'])?></td><td>$<?=money((float)$o['buy_price'])?></td><td><b>$<?=money($profit)?></b></td><td><span class="status <?=e($o['status'])?>"><?=e(ucfirst($o['status']))?></span></td><td><?=e($o['created_at'])?></td></tr><?php endforeach; ?>
-      <?php if(!$recent): ?><tr><td colspan="8">No orders yet.</td></tr><?php endif; ?></tbody></table></div></section>
-      <div class="footer-note">SkyNoc Admin · Live database overview · Use the sidebar for all management modules.</div>
-    </div>
-  </main>
-</div>
-<script src="/admin-page-router.js"></script>
-</body>
-</html>
+<aside class="sidebar" id="sidebar" aria-label="Admin navigation">
+<div class="sidebar-head"><div class="brand-mark">S</div><div><div class="brand-title">SkyNoc Admin</div><div class="brand-sub">Management Console</div></div></div>
+<?php require __DIR__.'/admin-sidebar.php'; ?>
+<div class="sidebar-footer"><div class="sidebar-user"><?=e($u['name'])?><small><?=e($u['role'])?> · Live system</small></div><a href="/">← Open SkyNoc</a><a href="/logout">Sign out</a></div>
+</aside>
+<div class="overlay" id="overlay"></div>
+<main class="main"><div class="mobile-top"><strong>SkyNoc Admin</strong><button class="menu-btn" id="menuBtn" type="button">☰ Menu</button></div>
+<div class="content">
+<section class="hero"><div class="hero-top"><div><div class="eyebrow">LIVE BUSINESS OVERVIEW</div><h1>License & Reseller Dashboard</h1><p>Production overview of licenses, reseller accounts, orders, revenue, cost and profit. Historical order cost is snapshotted and does not follow later package-price edits.</p></div><div class="hero-user"><strong><?=e($u['name'])?></strong><?=e($u['role'])?> account</div></div><div class="actions"><a class="btn" href="/admin/package-pricing">Package Pricing</a><a class="btn" href="/admin/reseller-funds">Wallet Funds</a><a class="btn" href="/admin/order-edit">Order & License Editor</a><a class="btn dark" href="/admin/reseller-activate">Pending Activations (<?=number_format($pendingActivation)?>)</a></div></section>
+<section class="grid"><div class="metric"><div class="label">TOTAL LICENSES</div><div class="value"><?=number_format($totalLicenses)?></div><div class="sub"><?=number_format($activeLicenses)?> active · <?=number_format($availableLicenses)?> available</div></div><div class="metric"><div class="label">RESELLERS</div><div class="value"><?=number_format($totalResellers)?></div><div class="sub"><?=number_format($activeResellers)?> active · <?=number_format($pendingActivation)?> pending</div></div><div class="metric"><div class="label">SALES REVENUE</div><div class="value">$<?=money($totalRevenue)?></div><div class="sub"><?=number_format($completedOrders)?> completed orders</div></div><div class="metric profit"><div class="label">TOTAL PROFIT</div><div class="value">$<?=money($totalProfit)?></div><div class="sub">Revenue $<?=money($totalRevenue)?> − cost $<?=money($totalCost)?></div></div></section>
+<section class="two"><div class="card"><h2>Operations</h2><div class="muted">Live queue and platform status.</div><div class="quick-grid"><a class="quick" href="/admin/orders"><strong><?=number_format($totalOrders)?> Orders</strong><span><?=number_format($pendingOrders)?> pending / processing</span></a><a class="quick" href="/admin/deposits"><strong><?=number_format($pendingDeposits)?> Deposits</strong><span>Waiting for review</span></a><a class="quick" href="/admin/packages"><strong><?=number_format($activePackages)?> Packages</strong><span>Currently enabled</span></a><a class="quick" href="/admin/licenses"><strong><?=number_format($availableLicenses)?> Licenses</strong><span>Available inventory</span></a><a class="quick" href="/admin/reissues"><strong>License Reissues</strong><span>Manage reissue requests</span></a><a class="quick" href="/admin/tickets"><strong>Support Tickets</strong><span>Open support workflow</span></a></div></div><div class="card"><h2>Financial Summary</h2><div class="muted">Completed-order accounting using snapshotted buy cost.</div><div class="quick-grid"><a class="quick" href="/admin/package-pricing"><strong>Sales $<?=money($totalRevenue)?></strong><span>Total completed revenue</span></a><a class="quick" href="/admin/package-pricing"><strong>Cost $<?=money($totalCost)?></strong><span>Historical order cost</span></a><a class="quick" href="/admin/package-pricing"><strong>Profit $<?=money($totalProfit)?></strong><span>Revenue minus historical cost</span></a><a class="quick" href="/admin/reports"><strong>Reports</strong><span>Detailed business reports</span></a><a class="quick" href="/admin/reseller-funds"><strong>Reseller Funds</strong><span>Credit / debit wallets</span></a><a class="quick" href="/admin/coupons"><strong>Coupons</strong><span>Discount management</span></a></div></div></section>
+<section class="card" style="margin-top:14px"><h2>Recent Orders</h2><div class="muted">Latest order activity with immutable buy-cost snapshot.</div><div class="table-wrap"><table class="table"><thead><tr><th>Order</th><th>Reseller</th><th>Package</th><th>Sales</th><th>Buy Cost</th><th>Profit</th><th>Status</th><th>Date</th></tr></thead><tbody><?php foreach($recent as $o): $profit=(float)$o['amount']-(float)($o['buy_cost']??0); ?><tr><td>#<?=e((string)$o['id'])?></td><td><?=e($o['reseller_name'])?></td><td><?=e($o['package_name'])?></td><td>$<?=money((float)$o['amount'])?></td><td>$<?=money((float)($o['buy_cost']??0))?></td><td><b>$<?=money($profit)?></b></td><td><span class="status <?=e($o['status'])?>"><?=e(ucfirst($o['status']))?></span></td><td><?=e($o['created_at'])?></td></tr><?php endforeach; ?><?php if(!$recent): ?><tr><td colspan="8">No orders yet.</td></tr><?php endif; ?></tbody></table></div></section>
+<div class="footer-note">SkyNoc Admin · Live database overview · Server-rendered navigation</div>
+</div></main></div>
+<script>
+const side=document.getElementById('sidebar'),overlay=document.getElementById('overlay'),btn=document.getElementById('menuBtn');
+if(btn)btn.onclick=()=>{side.classList.toggle('open');overlay.classList.toggle('show')};
+if(overlay)overlay.onclick=()=>{side.classList.remove('open');overlay.classList.remove('show')};
+</script>
+</body></html>
