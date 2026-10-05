@@ -18,6 +18,7 @@
     ['/admin/package-pricing','Package Pricing / Profit','Billing','৳'],
     ['/admin/invoice-settings','Invoice Settings','Billing','▤'],
 
+    ['/admin/reseller-add','Add Reseller','Resellers','＋'],
     ['/admin/reseller-activate','Activate Resellers','Resellers','●'],
     ['/admin/reseller-manage','Reseller Management','Resellers','♟'],
     ['/admin/reseller-funds','Reseller Funds','Resellers','$'],
@@ -27,8 +28,9 @@
 
     ['/admin/tickets','Support Tickets','Support','✉'],
 
+    ['/admin/user-management','User Management','Access & API','♙'],
+    ['/admin/staff','Staff Management','Access & API','♟'],
     ['/admin/api-keys','API Keys','Access & API','⚿'],
-    ['/admin/staff','Staff Management','Access & API','♙'],
 
     ['/admin/reports','Reports','Reports','↗'],
     ['/admin/coupons','Coupons','Reports','◇'],
@@ -39,7 +41,8 @@
     ['/admin/settings/discord','Discord','Settings','◉'],
     ['/admin/settings/telegram','Telegram','Settings','✈'],
     ['/admin/settings/telegram/message','Telegram Messages','Settings','☷'],
-    ['/admin/settings/smtp','SMTP / Email','Settings','@']
+    ['/admin/settings/smtp','SMTP / Email','Settings','@'],
+    ['/admin/settings/whitelabel','White-label Settings','Settings','◇']
   ];
 
   const side=document.querySelector('.sidebar');
