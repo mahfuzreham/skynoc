@@ -13,9 +13,13 @@ function skynoc_production_migrate(PDO $db): void
         $check->execute([$version]);
         if ($check->fetchColumn()) return;
 
-        $db->exec("ALTER TABLE orders ADD COLUMN buy_cost DECIMAL(18,2) NULL AFTER amount");
+        $column=$db->prepare("SELECT COUNT(*) FROM information_schema.columns WHERE table_schema=DATABASE() AND table_name='orders' AND column_name='buy_cost'");
+        $column->execute();
+        if ((int)$column->fetchColumn()===0) {
+            $db->exec("ALTER TABLE orders ADD COLUMN buy_cost DECIMAL(18,2) NULL AFTER amount");
+        }
 
-        /* Snapshot the package buy cost so changing package pricing cannot rewrite history. */
+        /* Snapshot the package/license buy cost so later package-price edits cannot rewrite history. */
         $db->exec("UPDATE orders o LEFT JOIN packages p ON p.id=o.package_id LEFT JOIN licenses l ON l.id=o.license_id SET o.buy_cost=COALESCE(l.cost,p.buy_price,0) WHERE o.buy_cost IS NULL");
 
         $db->exec("DROP TRIGGER IF EXISTS skynoc_orders_before_insert_cost");
