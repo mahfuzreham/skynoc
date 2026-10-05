@@ -1,0 +1,1 @@
+<?php require __DIR__ . '/../../public/admin-packages.php';
