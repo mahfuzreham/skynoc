@@ -24,7 +24,6 @@ function payment_methods(): array {
                 }
             }
 
-            // Also support nested payment-specific configuration.
             if ($address === '') {
                 foreach ($cfg as $nested) {
                     if (!is_array($nested)) continue;
@@ -37,9 +36,10 @@ function payment_methods(): array {
                 }
             }
 
-            // Keep the method name clean. The reseller UI can use this public
-            // value as a separate wallet-address display when needed.
             $row['public_address'] = $address;
+            // Keep the current UI backward-compatible until the reseller
+            // Add Funds card renders public_address in its own address box.
+            if ($address !== '') $row['name'] .= ' · Wallet: '.$address;
         }
         unset($row);
     }
