@@ -25,7 +25,6 @@ try {
 
     skynoc_migrate($db);
     skynoc_platform_integrations_migrate($db);
-    payment_method_cleanup($db);
     skynoc_hostname_migrate($db);
     skynoc_custom_migrate($db);
     skynoc_production_migrate($db);
