@@ -71,31 +71,32 @@ function skynoc_sms_send_user(int $userId, string $type, string $message, ?int $
     }
 
     $phone = trim((string)$contact['phone']);
+    $sender = (string)($settings['sender_id'] ?? '');
+    $apiKey = (string)($settings['api_key'] ?? '');
+    $apiSecret = (string)($settings['api_secret'] ?? '');
+
     $payload = [
         (string)($settings['recipient_field'] ?: 'to') => $phone,
         (string)($settings['message_field'] ?: 'message') => $message,
-        (string)($settings['sender_field'] ?: 'sender') => (string)($settings['sender_id'] ?? ''),
+        (string)($settings['sender_field'] ?: 'sender') => $sender,
     ];
     if (!empty($settings['payload_template'])) {
         $template = json_decode((string)$settings['payload_template'], true);
         if (is_array($template)) {
             $payload = skynoc_sms_replace_placeholders($template, [
-                'to' => $phone,
-                'message' => $message,
-                'sender' => (string)($settings['sender_id'] ?? ''),
-                'api_key' => (string)($settings['api_key'] ?? ''),
-                'api_secret' => (string)($settings['api_secret'] ?? ''),
+                'to' => $phone, 'message' => $message, 'sender' => $sender,
+                'api_key' => $apiKey, 'api_secret' => $apiSecret,
             ]);
         }
     }
 
-    $headers = ['Content-Type: application/json', 'Accept: application/json'];
+    $headers = ['Accept: application/json'];
     if (!empty($settings['api_key'])) {
         $header = (string)($settings['auth_header'] ?: 'Authorization');
         $prefix = (string)($settings['auth_prefix'] ?? 'Bearer ');
-        $headers[] = $header . ': ' . $prefix . (string)$settings['api_key'];
+        $headers[] = $header . ': ' . $prefix . $apiKey;
     }
-    if (!empty($settings['api_secret'])) $headers[] = 'X-API-Secret: ' . (string)$settings['api_secret'];
+    if (!empty($settings['api_secret'])) $headers[] = 'X-API-Secret: ' . $apiSecret;
 
     $log = $db->prepare('INSERT INTO sms_logs(user_id,license_id,type,phone,message,status,dedupe_key) VALUES(?,?,?,?,?,?,?)');
     try {
@@ -112,15 +113,45 @@ function skynoc_sms_send_user(int $userId, string $type, string $message, ?int $
         return ['status' => 'failed', 'log_id' => $logId, 'reason' => 'SMS API URL is not configured.'];
     }
 
-    $ch = curl_init($url);
-    curl_setopt_array($ch, [
-        CURLOPT_POST => true,
+    /*
+     * Provider modes:
+     * - query: username/password/sender/text/to are appended as URL parameters.
+     * - json: legacy generic JSON provider mode.
+     * The BD SMS example supplied by the admin uses query mode.
+     */
+    $method = strtolower(trim((string)($settings['http_method'] ?? 'query')));
+    $username = (string)($settings['api_username'] ?? '');
+    $password = (string)($settings['api_password'] ?? '');
+    $queryParams = [
+        'username' => $username,
+        'password' => $password,
+        'sender' => $sender,
+        'text' => $message,
+        'to' => $phone,
+    ];
+
+    $requestUrl = $url;
+    if ($method === 'query' || $method === 'get') {
+        $requestUrl .= (str_contains($requestUrl, '?') ? '&' : '?') . http_build_query($queryParams, '', '&', PHP_QUERY_RFC3986);
+        $method = 'get';
+    }
+
+    $ch = curl_init($requestUrl);
+    $curlOptions = [
         CURLOPT_RETURNTRANSFER => true,
         CURLOPT_CONNECTTIMEOUT => 10,
         CURLOPT_TIMEOUT => 25,
         CURLOPT_HTTPHEADER => $headers,
-        CURLOPT_POSTFIELDS => json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES),
-    ]);
+    ];
+    if ($method === 'post') {
+        $curlOptions[CURLOPT_POST] = true;
+        $curlOptions[CURLOPT_POSTFIELDS] = json_encode($payload, JSON_UNESCAPED_UNICODE | JSON_UNESCAPED_SLASHES);
+        $headers[] = 'Content-Type: application/json';
+        $curlOptions[CURLOPT_HTTPHEADER] = $headers;
+    } else {
+        $curlOptions[CURLOPT_HTTPGET] = true;
+    }
+    curl_setopt_array($ch, $curlOptions);
     $response = curl_exec($ch);
     $curlError = curl_error($ch);
     $httpCode = (int)curl_getinfo($ch, CURLINFO_HTTP_CODE);
