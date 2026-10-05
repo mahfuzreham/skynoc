@@ -79,5 +79,7 @@ RewriteRule ^admin/invoice-settings/?$ public/admin-invoice-settings.php [L,QSA]
 RewriteRule ^admin/settings/whitelabel/?$ public/admin-settings.php?section=whitelabel [L,QSA]
 RewriteRule ^admin/settings/?$ public/admin-settings.php [L,QSA]
 
+# Never expose deployment scripts through the web server.
+RewriteRule ^(?:tools|bin)(?:/|$) - [F,L]
 RewriteRule ^(login|logout|dashboard|admin|reseller)\.php$ /$1 [R=301,L]
-RewriteRule ^(?:app|config|database|storage|bin|modules)(?:/|$) - [F,L]
+RewriteRule ^(?:app|config|database|storage|modules)(?:/|$) - [F,L]
