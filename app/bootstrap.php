@@ -23,6 +23,39 @@ if (session_status() !== PHP_SESSION_ACTIVE) {
     ]);
 }
 
+/*
+ * One-time POST protection for the HTML admin/reseller dashboards.
+ * A successful form submission consumes the submitted CSRF token and rotates
+ * the session token. If the browser reloads the POST response, the browser
+ * resends the already-consumed token; redirect it to GET before any action is
+ * executed. This prevents re-issuing licenses, double wallet actions, duplicate
+ * deposits, repeated orders, ticket replies, and other POST side effects.
+ * API requests are intentionally excluded because they have their own auth flow.
+ */
+$requestPath = (string)(parse_url($_SERVER['REQUEST_URI'] ?? '/', PHP_URL_PATH) ?: '/');
+$isDashboardPost = ($_SERVER['REQUEST_METHOD'] ?? 'GET') === 'POST'
+    && (
+        str_starts_with($requestPath, '/admin')
+        || str_starts_with($requestPath, '/reseller')
+        || in_array(basename($requestPath), ['admin.php', 'reseller.php'], true)
+    );
+
+if ($isDashboardPost) {
+    $submittedCsrf = (string)($_POST['_csrf'] ?? '');
+    $currentCsrf = (string)($_SESSION['_csrf'] ?? '');
+    $consumedCsrf = (string)($_SESSION['_csrf_consumed'] ?? '');
+
+    if ($submittedCsrf !== '' && $consumedCsrf !== '' && hash_equals($consumedCsrf, $submittedCsrf)) {
+        header('Location: ' . $_SERVER['REQUEST_URI'], true, 303);
+        exit;
+    }
+
+    if ($submittedCsrf !== '' && $currentCsrf !== '' && hash_equals($currentCsrf, $submittedCsrf)) {
+        $_SESSION['_csrf_consumed'] = $submittedCsrf;
+        $_SESSION['_csrf'] = bin2hex(random_bytes(32));
+    }
+}
+
 $dsn = sprintf(
     'mysql:host=%s;port=%d;dbname=%s;charset=%s',
     $config['db']['host'],
