@@ -1,3 +1,3 @@
 <?php
-// Compatibility route: keep the legacy license workspace available at /admin/licenses.
-require __DIR__ . '/admin.php';
+// License Inventory workspace: editable/deletable inventory plus manual first activation.
+require __DIR__ . '/admin-license-inventory.php';
