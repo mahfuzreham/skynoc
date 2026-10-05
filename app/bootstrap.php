@@ -53,6 +53,8 @@ if ($isDashboardPost) {
     if ($submittedCsrf !== '' && $currentCsrf !== '' && hash_equals($currentCsrf, $submittedCsrf)) {
         $_SESSION['_csrf_consumed'] = $submittedCsrf;
         $_SESSION['_csrf'] = bin2hex(random_bytes(32));
+        // verify_csrf() must validate the rotated token during this same request.
+        $_POST['_csrf'] = $_SESSION['_csrf'];
     }
 }
 
