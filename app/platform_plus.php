@@ -78,3 +78,42 @@ function platform_invoice_number(int $id): string {
     try { $cfg=$db->query('SELECT invoice_prefix FROM invoice_settings WHERE id=1 LIMIT 1')->fetchColumn(); if(is_string($cfg) && $cfg!=='') $prefix=$cfg; } catch(Throwable $e) { }
     return $prefix.date('Ym').'-'.str_pad((string)$id,7,'0',STR_PAD_LEFT);
 }
+
+/**
+ * Monthly/annual wallet billing for active license subscriptions.
+ * Package price is the reseller sales charge; package buy_price is the admin cost/profit basis.
+ * A renewal is only processed when the reseller wallet has enough balance.
+ */
+function platform_monthly_billing(int $limit=100): array {
+    global $db;
+    $processed=0; $suspended=0; $initialized=0; $failed=0;
+    $rows=$db->query("SELECT l.*,p.name package_name,p.price,p.buy_price,p.billing_period,r.wallet_balance,r.name reseller_name FROM licenses l JOIN packages p ON p.id=l.package_id JOIN resellers r ON r.id=l.reseller_id WHERE l.status='active' AND p.billing_period IN ('monthly','annual') ORDER BY l.expires_at IS NULL DESC,l.expires_at ASC LIMIT ".(int)$limit)->fetchAll();
+    foreach($rows as $l){
+        try{
+            // Existing active licenses without an expiry get their first billing date here.
+            if(empty($l['expires_at'])){
+                $base=!empty($l['purchase_date']) ? $l['purchase_date'] : date('Y-m-d');
+                $interval=$l['billing_period']==='annual'?'1 YEAR':'1 MONTH';
+                $db->prepare("UPDATE licenses SET expires_at=DATE_ADD(?,INTERVAL $interval) WHERE id=? AND expires_at IS NULL")->execute([$base,$l['id']]);
+                $initialized++; continue;
+            }
+            if(strtotime((string)$l['expires_at']) > time()) continue;
+            $amount=(float)$l['price'];
+            $db->beginTransaction();
+            $q=$db->prepare('SELECT wallet_balance,status FROM resellers WHERE id=? FOR UPDATE');$q->execute([(int)$l['reseller_id']);$r=$q->fetch();
+            if(!$r || $r['status']!=='active' || (float)$r['wallet_balance'] < $amount){
+                $db->prepare("UPDATE licenses SET status='suspended' WHERE id=? AND status='active'")->execute([(int)$l['id']]);
+                $db->commit();$suspended++;notify_reseller((int)$l['reseller_id'],'billing_failed','License renewal failed','Monthly renewal for license '.$l['license_key'].' could not be charged because the reseller wallet balance is insufficient.');continue;
+            }
+            $stmt=$db->prepare("UPDATE resellers SET wallet_balance=wallet_balance-? WHERE id=? AND wallet_balance>=?");$stmt->execute([$amount,(int)$l['reseller_id'],$amount]);
+            if($stmt->rowCount()!==1) throw new RuntimeException('Wallet debit failed.');
+            $reference='RENEW-LIC-'.$l['id'].'-'.date('Ym');
+            $db->prepare("INSERT INTO wallet_transactions(reseller_id,type,amount,reference,description,order_id,created_by) VALUES(?,?,?,?,?,NULL,NULL)")->execute([(int)$l['reseller_id'],'purchase',$amount,$reference,'Automatic '.($l['billing_period']==='annual'?'annual':'monthly').' license renewal - '.$l['license_key']]);
+            $interval=$l['billing_period']==='annual'?'1 YEAR':'1 MONTH';
+            $db->prepare("UPDATE licenses SET expires_at=DATE_ADD(expires_at,INTERVAL $interval),status='active' WHERE id=?")->execute([(int)$l['id']]);
+            $db->commit();$processed++;
+            notify_reseller((int)$l['reseller_id'],'license_renewed','License renewed','License '.$l['license_key'].' was renewed automatically for '.$amount.'.');
+        }catch(Throwable $e){if($db->inTransaction())$db->rollBack();$failed++;error_log('SkyNoc renewal error: '.$e->getMessage());}
+    }
+    return compact('processed','suspended','initialized','failed');
+}
