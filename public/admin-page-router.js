@@ -16,6 +16,7 @@
     ['/admin/reseller-manage','Reseller Management','Resellers','♟'],
     ['/admin/reseller-funds','Reseller Funds','Resellers','$'],
     ['/admin/reseller-levels','Reseller Levels','Resellers','★'],
+    ['/admin/providers','Provider Accounts','Licensing','▣'],
     ['/admin/hostname','Cloudflare Hostnames','Products','⌁'],
     ['/admin/reports','Reports','Reports','↗'],
     ['/admin/coupons','Coupons','Reports','◇'],
