@@ -2,6 +2,21 @@
 declare(strict_types=1);
 
 $config = require __DIR__ . '/../config/config.php';
+
+// Keep production installs resilient when older config.php files are missing newer keys.
+$config['timezone'] = (string)($config['timezone'] ?? 'Asia/Dhaka');
+$config['session_name'] = (string)($config['session_name'] ?? 'skynoc_session');
+$config['db'] = is_array($config['db'] ?? null) ? $config['db'] : [];
+$config['db']['host'] = (string)($config['db']['host'] ?? '127.0.0.1');
+$config['db']['port'] = (int)($config['db']['port'] ?? 3306);
+$config['db']['charset'] = (string)($config['db']['charset'] ?? 'utf8mb4');
+$config['db']['name'] = (string)($config['db']['name'] ?? '');
+$config['db']['user'] = (string)($config['db']['user'] ?? '');
+$config['db']['pass'] = (string)($config['db']['pass'] ?? '');
+
+if ($config['timezone'] === '') {
+    $config['timezone'] = 'Asia/Dhaka';
+}
 date_default_timezone_set($config['timezone']);
 
 header('X-Content-Type-Options: nosniff');
