@@ -51,6 +51,7 @@ require_once __DIR__ . '/usdt.php';
 require_once __DIR__ . '/payment.php';
 require_once __DIR__ . '/cloudflare.php';
 require_once __DIR__ . '/reseller_notifications.php';
+require_once __DIR__ . '/sms.php';
 require_once __DIR__ . '/order_automation.php';
 require_once __DIR__ . '/hostname_automation.php';
 require_once __DIR__ . '/binance.php';
