@@ -3,7 +3,7 @@
   const side=document.querySelector('.sidebar');
   if(!side)return;
 
-  /* The sidebar is now server-rendered. JS only enhances it and provides a
+  /* The sidebar is server-rendered. JS only enhances it and provides a
      fallback for legacy admin pages that still have an empty navigation area. */
   const fallbackLinks=[
     ['/admin/dashboard','Dashboard','Workspace','▦'],['/admin/packages','Packages','Workspace','◈'],['/admin/orders','Orders','Workspace','▤'],['/admin/deposits','Deposits','Workspace','◫'],['/admin/licenses','License Inventory','Workspace','▥'],
@@ -11,7 +11,7 @@
     ['/admin/package-pricing','Package Pricing / Profit','Billing','৳'],['/admin/invoice-settings','Invoice Settings','Billing','▤'],
     ['/admin/reseller-add','Add Reseller','Resellers','＋'],['/admin/reseller-activate','Activate Resellers','Resellers','●'],['/admin/reseller-manage','Reseller Management','Resellers','♟'],['/admin/reseller-funds','Reseller Funds','Resellers','$'],['/admin/reseller-levels','Reseller Levels','Resellers','★'],
     ['/admin/hostname','Cloudflare Hostnames','Products','⌁'],['/admin/tickets','Support Tickets','Support','✉'],['/admin/user-management','User Management','Access & API','♙'],['/admin/staff','Staff Management','Access & API','♟'],['/admin/api-keys','API Keys','Access & API','⚿'],['/admin/reports','Reports','Reports','↗'],['/admin/coupons','Coupons','Reports','◇'],
-    ['/admin/settings','General Settings','Settings','⚙'],['/admin/settings/payments','Payment Methods','Settings','৳'],['/admin/settings/binance','Binance / Crypto','Settings','₿'],['/admin/settings/discord','Discord','Settings','◉'],['/admin/settings/telegram','Telegram','Settings','✈'],['/admin/settings/telegram/message','Telegram Messages','Settings','☷'],['/admin/settings/smtp','SMTP / Email','Settings','@'],['/admin/settings/whitelabel','White-label Settings','Settings','◇']
+    ['/admin/settings','General Settings','Settings','⚙'],['/admin/settings/payments','Payment Methods','Settings','৳'],['/admin/settings/binance','Binance / Crypto','Settings','₿'],['/admin/settings/sms','SMS Automation','Settings','▣'],['/admin/settings/discord','Discord','Settings','◉'],['/admin/settings/telegram','Telegram','Settings','✈'],['/admin/settings/telegram/message','Telegram Messages','Settings','☷'],['/admin/settings/smtp','SMTP / Email','Settings','@'],['/admin/settings/whitelabel','White-label Settings','Settings','◇']
   ];
 
   function enhance(){
