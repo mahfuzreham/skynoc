@@ -6,28 +6,40 @@
     ['/admin/orders','Orders','Workspace','▤'],
     ['/admin/deposits','Deposits','Workspace','◫'],
     ['/admin/licenses','License Inventory','Workspace','▥'],
+
     ['/admin/license-add','Add License','Licensing','＋'],
     ['/admin/license-transfer','License Transfer','Licensing','⇄'],
     ['/admin/order-edit','Edit Orders / License Key','Licensing','✎'],
     ['/admin/order-fulfill','Order Fulfillment','Licensing','✓'],
     ['/admin/renew','Renewals / Billing','Licensing','↻'],
     ['/admin/providers','Provider Accounts','Licensing','▣'],
+    ['/admin/reissues','License Reissues','Licensing','↻'],
+
     ['/admin/package-pricing','Package Pricing / Profit','Billing','৳'],
+    ['/admin/invoice-settings','Invoice Settings','Billing','▤'],
+
     ['/admin/reseller-activate','Activate Resellers','Resellers','●'],
     ['/admin/reseller-manage','Reseller Management','Resellers','♟'],
     ['/admin/reseller-funds','Reseller Funds','Resellers','$'],
     ['/admin/reseller-levels','Reseller Levels','Resellers','★'],
+
     ['/admin/hostname','Cloudflare Hostnames','Products','⌁'],
+
+    ['/admin/tickets','Support Tickets','Support','✉'],
+
+    ['/admin/api-keys','API Keys','Access & API','⚿'],
+    ['/admin/staff','Staff Management','Access & API','♙'],
+
     ['/admin/reports','Reports','Reports','↗'],
     ['/admin/coupons','Coupons','Reports','◇'],
+
     ['/admin/settings','General Settings','Settings','⚙'],
     ['/admin/settings/payments','Payment Methods','Settings','৳'],
     ['/admin/settings/binance','Binance / Crypto','Settings','₿'],
     ['/admin/settings/discord','Discord','Settings','◉'],
     ['/admin/settings/telegram','Telegram','Settings','✈'],
     ['/admin/settings/telegram/message','Telegram Messages','Settings','☷'],
-    ['/admin/settings/smtp','SMTP / Email','Settings','@'],
-    ['/admin/invoice-settings','Invoice Settings','Settings','▤']
+    ['/admin/settings/smtp','SMTP / Email','Settings','@']
   ];
 
   const side=document.querySelector('.sidebar');
@@ -40,7 +52,7 @@
   const groups=[];
   links.forEach(item=>{if(!groups.includes(item[2]))groups.push(item[2]);});
 
-  groups.forEach((group,index)=>{
+  groups.forEach(group=>{
     const items=links.filter(x=>x[2]===group);
     const active=items.some(x=>x[0].replace(/\/+$/,'')===path);
     const details=document.createElement('details');
@@ -49,7 +61,7 @@
 
     const summary=document.createElement('summary');
     summary.className='nav-group-title';
-    summary.innerHTML='<span class="nav-group-icon">'+({Workspace:'▦',Licensing:'◈',Billing:'৳',Resellers:'♟',Products:'⌁',Reports:'↗',Settings:'⚙'}[group]||'•')+'</span><span>'+group+'</span><span class="nav-chevron">⌄</span>';
+    summary.innerHTML='<span class="nav-group-icon">'+({Workspace:'▦',Licensing:'◈',Billing:'৳',Resellers:'♟',Products:'⌁',Support:'✉','Access & API':'⚿',Reports:'↗',Settings:'⚙'}[group]||'•')+'</span><span>'+group+'</span><span class="nav-chevron">⌄</span>';
     details.appendChild(summary);
 
     const body=document.createElement('div');
