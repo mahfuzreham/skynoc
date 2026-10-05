@@ -2,10 +2,10 @@
   const path=location.pathname.replace(/\/+$/,'')||'/admin/dashboard';
   const links=[
     ['/admin/dashboard','Dashboard','Workspace','▦'],
-    ['/admin/dashboard#packages','Packages','Workspace','◈'],
-    ['/admin/dashboard#orders','Orders','Workspace','▤'],
-    ['/admin/dashboard#deposits','Deposits','Workspace','◫'],
-    ['/admin/dashboard#licenses','License Inventory','Workspace','▥'],
+    ['/admin/packages','Packages','Workspace','◈'],
+    ['/admin/orders','Orders','Workspace','▤'],
+    ['/admin/deposits','Deposits','Workspace','◫'],
+    ['/admin/licenses','License Inventory','Workspace','▥'],
     ['/admin/license-add','Add License','Licensing','＋'],
     ['/admin/license-transfer','License Transfer','Licensing','⇄'],
     ['/admin/order-edit','Edit Orders / License Key','Licensing','✎'],
@@ -13,7 +13,7 @@
     ['/admin/renew','Renewals / Billing','Licensing','↻'],
     ['/admin/package-pricing','Package Pricing / Profit','Billing','৳'],
     ['/admin/reseller-activate','Activate Resellers','Resellers','●'],
-    ['/admin/resellers','Reseller Management','Resellers','♟'],
+    ['/admin/reseller-manage','Reseller Management','Resellers','♟'],
     ['/admin/reseller-funds','Reseller Funds','Resellers','$'],
     ['/admin/reseller-levels','Reseller Levels','Resellers','★'],
     ['/admin/hostname','Cloudflare Hostnames','Products','⌁'],
@@ -34,7 +34,6 @@
   const footer=side.querySelector('.sidebar-footer');
   if(!footer)return;
 
-  // Rebuild only the navigation area. Brand and logged-in user footer remain untouched.
   side.querySelectorAll('.nav-label,.side-link').forEach(el=>el.remove());
 
   const groups=[];
@@ -55,7 +54,6 @@
     });
   });
 
-  // Mobile sidebar behaviour used by the main admin shell.
   const menuBtn=document.getElementById('menuBtn');
   const overlay=document.getElementById('overlay');
   if(menuBtn){menuBtn.onclick=function(){side.classList.toggle('open');if(overlay)overlay.classList.toggle('show');};}
